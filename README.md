@@ -6,6 +6,14 @@ A DirectX 11 internal hook with ImGui interface for advanced client modification
   <img src="docs/preview.png" width="700"/>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/github/license/iVyz3r/aegledll" alt="License" />
+  <img src="https://img.shields.io/github/stars/iVyz3r/aegledll" alt="Stars" />
+  <img src="https://img.shields.io/github/issues/iVyz3r/aegledll" alt="Issues" />
+  <img src="https://img.shields.io/github/last-commit/iVyz3r/aegledll" alt="Last Commit" />
+  <img src="https://img.shields.io/github/topics/iVyz3r/aegledll?label=topics" alt="Topics" />
+</p>
+
 ## Overview
 
 Aegleseeker is an internal client modification framework that hooks into DirectX 11 applications. It provides:
