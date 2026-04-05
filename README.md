@@ -2,6 +2,10 @@
 
 A DirectX 11 internal hook with ImGui interface for advanced client modifications. This project provides a DLL injection framework with a comprehensive feature set including hitbox extensions, motion blur, keystroke tracking, and more.
 
+<p align="center">
+  <img src="docs/preview.png" width="700"/>
+</p>
+
 ## Overview
 
 Aegleseeker is an internal client modification framework that hooks into DirectX 11 applications. It provides:
