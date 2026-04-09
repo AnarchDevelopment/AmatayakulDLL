@@ -63,7 +63,7 @@ This generates the DLL in `build/` directory.
 ## Project Structure
 
 ```
-│   .gitignore                  # Files to ignore in git
+aegledll/
 │   build.ps1                   # PowerShell build script
 │   dllmain.cpp                 # DLL entry and hook setup
 │   README.md                   # Project documentation
