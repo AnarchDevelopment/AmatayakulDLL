@@ -1,5 +1,6 @@
 #include "Hitbox.hpp"
 #include "../../../Animations/Animations.hpp"
+#include "../../Alloc/AllocateNear.hpp"
 #include "../../../ImGui/imgui.h"
 #include <windows.h>
 #include <cstring>
@@ -15,9 +16,6 @@ void* Hitbox::g_hitboxCave = nullptr;
 BYTE Hitbox::g_hitboxBackup[8] = { 0 };
 ULONGLONG Hitbox::g_hitboxEnableTime = 0;
 ULONGLONG Hitbox::g_hitboxDisableTime = 0;
-
-// Forward declarations for helper functions
-extern void* AllocateNear(uintptr_t reference, size_t size);
 
 void Hitbox::Initialize(uintptr_t gameBase) {
     g_hitboxAddr = gameBase + 0x4B57B0;
@@ -35,7 +33,7 @@ void Hitbox::Disable() {
 void Hitbox::Enable() {
     if (!g_hitboxAddr) return;
     g_hitboxEnableTime = GetTickCount64();
-    if (!g_hitboxCave) g_hitboxCave = AllocateNear(g_hitboxAddr, 1024);
+    if (!g_hitboxCave) g_hitboxCave = AllocateNear::Allocate(g_hitboxAddr, 1024);
     if (!g_hitboxCave) return;
 
     memcpy(g_hitboxBackup, (void*)g_hitboxAddr, 8);

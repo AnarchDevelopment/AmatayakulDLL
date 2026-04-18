@@ -11,3 +11,4 @@
 #include "Visuals/Keystrokes/Keystrokes.hpp"
 #include "Visuals/CPSCounter/CPSCounter.hpp"
 #include "Misc/UnlockFPS/UnlockFPS.hpp"
+#include "Info/Info.hpp"

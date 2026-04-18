@@ -12,13 +12,18 @@ class Reach {
 public:
     static float* g_reachPtr;
     static float g_reachValue;
+    static bool g_reachEnabled;
     static ULONGLONG g_reachEnableTime;
+    static ULONGLONG g_reachDisableTime;
 
     // Initialize reach module
     static void Initialize(uintptr_t gameBase);
 
     // Update reach value in memory
     static void UpdateValue(float newValue);
+
+    // Enable or disable reach module
+    static void SetEnabled(bool enabled);
 
     // Render reach in array list
     static void RenderArrayList(ImDrawList* draw, ImVec2 arrayListStart, float& yPos, ImVec2& arrayListEnd);
@@ -27,5 +32,5 @@ public:
     static void RenderMenu();
 
     // Check if reach is enabled
-    static bool IsEnabled() { return g_reachPtr != nullptr; }
+    static bool IsEnabled() { return g_reachEnabled; }
 };

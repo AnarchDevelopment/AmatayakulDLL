@@ -14,10 +14,15 @@
 #include "ImGui/backend/imgui_impl_dx11.h"
 #include "ImGui/backend/imgui_impl_win32.h"
 #include "Modules/ModuleHeader.hpp"
+#include "Modules/ModuleManager.hpp"
+#include "Modules/PatternScan/PatternScan.hpp"
+#include "Modules/Globals.hpp"
 #include "Animations/Animations.hpp"
 #include "GUI/GUI.hpp"
+#include "GUI/DX11/ImGuiRenderer.hpp"
 #include "Hook/Hook.hpp"
 #include "Input/Input.hpp"
+#include "Config/ConfigManager.hpp"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -37,24 +42,20 @@ ImGuiConfigFlags g_imguiConfigFlags = ImGuiConfigFlags_None;
 
 // Global variables
 WNDPROC oWndProc = NULL;
+HMODULE g_hModule = NULL;
 
 ID3D11Device* pDevice = NULL;
 ID3D11DeviceContext* pContext = NULL;
 ID3D11RenderTargetView* mainRenderTargetView = NULL;
+ma_engine g_audioEngine;
 HWND g_window = NULL;
 
 bool g_showMenu = false;
+bool g_RequestUnload = false;
 float g_menuAnim = 0.0f;
 ULONGLONG g_lastTime = 0, g_lastToggle = 0, g_notifStart = 0;
 bool g_vsync = false;
 float g_lastW = 0, g_lastH = 0;
-
-// Module animations
-ULONGLONG g_hitboxEnableTime = 0, g_hitboxDisableTime = 0;
-ULONGLONG g_autoSprintEnableTime = 0, g_autoSprintDisableTime = 0;
-ULONGLONG g_fullBrightEnableTime = 0, g_fullBrightDisableTime = 0;
-ULONGLONG g_timerEnableTime = 0, g_timerDisableTime = 0;
-ULONGLONG g_unlockFpsEnableTime = 0, g_unlockFpsDisableTime = 0;
 
 // Tab animation
 int g_currentTab = 0;
@@ -93,37 +94,6 @@ bool IsInWorld() {
 
 // Keystrokes data - now handled by Keystrokes class
 
-// CPS counter data
-#define MAX_CPS_HISTORY 100
-ULONGLONG g_lmbClickTimes[MAX_CPS_HISTORY] = {};
-ULONGLONG g_rmbClickTimes[MAX_CPS_HISTORY] = {};
-int g_lmbClickIndex = 0;
-int g_rmbClickIndex = 0;
-int g_lmbCps = 0;
-int g_rmbCps = 0;
-
-bool g_prevLmbPressed = false;
-bool g_prevRmbPressed = false;
-
-// Keystrokes config - now handled by Keystrokes class
-
-// CPS Counter variables moved to CPSCounter.hpp/cpp
-
-// Keystrokes mouse buttons config
-bool g_keystrokesShowMouseButtons = true;
-bool g_keystrokesShowLMBRMB = true;
-bool g_keystrokesShowSpacebar = true;
-float g_keystrokesSpacebarWidth = 0.5f;
-float g_keystrokesSpacebarHeight = 0.09f;
-
-// Keystrokes shadow colors
-ImVec4 g_keystrokesDisabledShadowColor = ImVec4(0.0f, 0.0f, 0.0f, 0.55f);
-ImVec4 g_keystrokesEnabledShadowColor = ImVec4(0.0f, 0.0f, 0.0f, 0.55f);
-
-// LMB/RMB format variables
-std::string g_keystrokesLMBFormatText = "{value} CPS";
-std::string g_keystrokesRMBFormatText = "{value} CPS";
-
 // HUD elements
 HudElement g_watermarkHud = { ImVec2(10, 10), ImVec2(400, 80) };
 HudElement g_renderInfoHud = { ImVec2(10, 100), ImVec2(220, 120) };
@@ -132,49 +102,18 @@ HudElement g_keystrokesHud = { ImVec2(30, 0), ImVec2(140, 150) };
 HudElement g_cpsHud = { ImVec2(500, 400), ImVec2(80, 30) };  // Will be initialized in CPSCounter
 
 // Input blocking
-static HHOOK g_keyboardHook = nullptr;
 
 // Keyboard hook
 LRESULT CALLBACK KeyboardBlockHookProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode < 0) {
-        return CallNextHookEx(g_keyboardHook, nCode, wParam, lParam);
+        return CallNextHookEx(Input::g_keyboardHook, nCode, wParam, lParam);
     }
     
-    // Allow all input when menu is open
-    if (g_showMenu) {
-        return CallNextHookEx(g_keyboardHook, nCode, wParam, lParam);
-    }
-    
-    // Block input when menu is closed
-    if (nCode == HC_ACTION) {
-        PKBDLLHOOKSTRUCT pKey = (PKBDLLHOOKSTRUCT)lParam;
-        if (pKey) {
-            // Allow INSERT key
-            if (pKey->vkCode == VK_INSERT) {
-                return CallNextHookEx(g_keyboardHook, nCode, wParam, lParam);
-            }
-            // Block other keys
-            return 1;
-        }
-    }
-    
-    return CallNextHookEx(g_keyboardHook, nCode, wParam, lParam);
-}
-
-void BlockGameInput() {
-    // Install hook if needed
-    if (!g_keyboardHook) {
-        HMODULE hMod = GetModuleHandleA("internal_hook");
-        if (!hMod) hMod = GetModuleHandleA(nullptr);
-        g_keyboardHook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardBlockHookProc, hMod, 0);
-    }
-}
-
-void UnblockGameInput() {
-    // Remove keyboard hook
-    if (g_keyboardHook) {
-        UnhookWindowsHookEx(g_keyboardHook);
-        g_keyboardHook = nullptr;
+    int result = Input::KeyboardBlockHookProc(nCode, wParam, lParam, g_showMenu);
+    if (result == 1) {
+        return 1;  // Block
+    } else {
+        return CallNextHookEx(Input::g_keyboardHook, nCode, wParam, lParam);
     }
 }
 
@@ -194,83 +133,6 @@ ImVec4 LerpImVec4(ImVec4 a, ImVec4 b, float t) {
 
 // CPS format processor moved to CPSCounter.cpp
 
-// Keystrokes format processor
-std::string ProcessKeystrokesFormat(const std::string& format, int value) {
-    std::string result = format;
-    std::string formatUpper = format;
-    for (char& c : formatUpper) c = std::toupper(c);
-    
-    size_t pos = formatUpper.find("{VALUE}");
-    if (pos != std::string::npos) {
-        char buffer[32];
-        snprintf(buffer, sizeof(buffer), "%d", value);
-        result.replace(pos, 7, buffer);
-    }
-    
-    return result;
-}
-
-// ImGui resize fix
-// Sync ImGui + DX11
-void SyncImGuiAndDX11(IDXGISwapChain* pSwapChain, float& width, float& height)
-{
-    DXGI_SWAP_CHAIN_DESC sd;
-    pSwapChain->GetDesc(&sd);
-
-    // Fallback for full screen edge cases
-    if (width <= 0 || height <= 0)
-    {
-        RECT rect;
-        GetClientRect(sd.OutputWindow, &rect);
-        width  = (float)(rect.right - rect.left);
-        height = (float)(rect.bottom - rect.top);
-    }
-
-    // Real viewport in pixels
-    D3D11_VIEWPORT vp;
-    vp.Width    = width;
-    vp.Height   = height;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-
-    pContext->RSSetViewports(1, &vp);
-
-    // ImGui DisplaySize matches backbuffer size
-    ImGuiIO& io = ImGui::GetIO();
-    io.DisplaySize = ImVec2(width, height);
-    
-    // DisplayFramebufferScale = 1.0f (backbuffer es la fuente de verdad)
-    io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
-}
-
-void* AllocateNear(uintptr_t reference, size_t size) {
-    intptr_t deltas[] = { 0x1000000, 0x2000000, 0x4000000, -0x1000000, -0x2000000, -0x4000000 };
-    for (int i = 0; i < 6; i++) {
-        uintptr_t target = reference + deltas[i];
-        void* addr = VirtualAlloc((void*)target, size, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-        if (addr) {
-            // Check if within 32-bit range
-            int64_t jmpRel = (uintptr_t)addr - (reference + 5);
-            if (jmpRel >= -0x80000000LL && jmpRel <= 0x7FFFFFFFLL) {
-                return addr;
-            }
-            VirtualFree(addr, 0, MEM_RELEASE);
-        }
-    }
-    return NULL; // No near address found
-}
-
-uintptr_t PatternScan(uintptr_t start, size_t size, const BYTE* pattern, size_t patternSize) {
-    for (size_t i = 0; i <= size - patternSize; ++i) {
-        if (memcmp((void*)(start + i), pattern, patternSize) == 0) {
-            return start + i;
-        }
-    }
-    return 0;
-}
-
 // --- Motion Blur Infrastructure (delegated to MotionBlur class) ---
 
 void ImageWithOpacity(ID3D11ShaderResourceView* srv, ImVec2 size, float opacity) {
@@ -285,20 +147,6 @@ void ImageWithOpacity(ID3D11ShaderResourceView* srv, ImVec2 size, float opacity)
     draw_list->AddImage((ImTextureID)srv, pos, ImVec2(pos.x + size.x, pos.y + size.y), ImVec2(0, 0), ImVec2(1, 1), col);
 }
 
-
-// Hitbox logic
-
-void InitializeBackbufferStorage(int maxFrames) {
-    MotionBlur::InitializeBackbufferStorage(maxFrames);
-}
-
-ID3D11ShaderResourceView* CopyBackbufferToSRV(IDXGISwapChain* pSwapChain, ID3D11Device* pDevice, ID3D11DeviceContext* pContext) {
-    return MotionBlur::CopyBackbufferToSRV(pDevice, pContext, pSwapChain);
-}
-
-void CleanupBackbufferStorage() {
-    MotionBlur::CleanupBackbufferStorage();
-}
 
 // Hitbox logic
 // --- 🏃 AUTOSPRINT ---
@@ -343,11 +191,8 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
             ImGui_ImplWin32_Init(g_window);
             ImGui_ImplDX11_Init(pDevice, pContext);
             
-            // Cargar fuente Segoe UI del sistema
-            ImGuiIO& io = ImGui::GetIO();
-            io.IniFilename = NULL;  // No generar .ini
-            // Arial
-            io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\Arial.ttf", 16.0f);
+            // Cargar fuente personalizada
+            GUI::LoadFont();
             ImGui_ImplDX11_CreateDeviceObjects();
             
             // 🎨 APLICAR TEMA
@@ -360,28 +205,20 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
             oWndProc = (WNDPROC)SetWindowLongPtr(g_window, GWLP_WNDPROC, (LONG_PTR)hkWndProc);
             
             g_gameBase = (uintptr_t)GetModuleHandleA(NULL);
-            Reach::Initialize(g_gameBase);
-            Hitbox::Initialize(g_gameBase);
-            Timer::Initialize(g_gameBase);
-            RenderInfo::Initialize(&g_renderInfoHud);
-            Watermark::Initialize(&g_watermarkHud);
-            Keystrokes::Initialize(&g_keystrokesHud);
-            CPSCounter::Initialize(&g_cpsHud);
-            Terminal::Initialize();
+            Module::Initialize(g_gameBase, &g_renderInfoHud, &g_watermarkHud, &g_keystrokesHud, &g_cpsHud);
 
-            // Scan for AutoSprint pattern
             HMODULE hModule = GetModuleHandleA(NULL);
             MODULEINFO mi;
             GetModuleInformation(GetCurrentProcess(), hModule, &mi, sizeof(mi));
             if (!AutoSprint::g_autoSprintAddr) {
                 BYTE pattern[] = {0x0F, 0xB6, 0x41, 0x63, 0x48, 0x8D, 0x2D, 0x39, 0xE0, 0xC3, 0x00};
-                AutoSprint::g_autoSprintAddr = PatternScan(g_gameBase, mi.SizeOfImage, pattern, sizeof(pattern));
+                AutoSprint::g_autoSprintAddr = PatternScan::Scan(g_gameBase, mi.SizeOfImage, pattern, sizeof(pattern));
             }
 
             // Scan for FullBright pattern
             if (!FullBright::g_fullBrightAddr) {
                 BYTE pattern[] = {0xF3, 0x0F, 0x10, 0x80, 0xA0, 0x01, 0x00, 0x00};
-                FullBright::g_fullBrightAddr = PatternScan(g_gameBase, mi.SizeOfImage, pattern, sizeof(pattern));
+                FullBright::g_fullBrightAddr = PatternScan::Scan(g_gameBase, mi.SizeOfImage, pattern, sizeof(pattern));
             }
 
             g_notifStart = GetTickCount64();
@@ -413,10 +250,10 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
             if (maxFrames <= 0) maxFrames = 4;
             if (maxFrames > 16) maxFrames = 16;
             
-            InitializeBackbufferStorage(maxFrames);
+            MotionBlur::InitializeBackbufferStorage(maxFrames);
             
             // Copy backbuffer to SRV
-            ID3D11ShaderResourceView* srv = CopyBackbufferToSRV(pSwapChain, pDevice, pContext);
+            ID3D11ShaderResourceView* srv = MotionBlur::CopyBackbufferToSRV(pDevice, pContext, pSwapChain);
             if (srv) {
                 // Remove oldest frame if exceeding max frames
                 if ((int)MotionBlur::g_previousFrames.size() >= maxFrames) {
@@ -443,7 +280,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
         
         if (g_showMenu) {
             // 🎮 BLOQUEAR INPUT DEL JUEGO
-            BlockGameInput();
+            Input::BlockGameInput();
             
             Hook::oClipCursor(NULL);
             // Si estamos en un mundo, ocultar cursor SO (mostrar cursor ImGui)
@@ -455,7 +292,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
             }
         } else {
             // 🎮 DESBLOQUEAR INPUT DEL JUEGO
-            UnblockGameInput();
+            Input::UnblockGameInput();
             
             // Menu closed - ensure cursor visible
             while (ShowCursor(TRUE) < 0);
@@ -465,7 +302,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     // Motion blur cleanup
     static bool wasMotionBlurEnabled = false;
     if (!MotionBlur::g_motionBlurEnabled && wasMotionBlurEnabled) {
-        CleanupBackbufferStorage();
+        MotionBlur::CleanupBackbufferStorage();
     }
     wasMotionBlurEnabled = MotionBlur::g_motionBlurEnabled;
 
@@ -477,58 +314,18 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     // 📉 MENU ANIMATION - Delegado a GUI
     GUI::UpdateAnimation(now, dt);
     float easedMenuAnim = Animations::SmoothInertia(GUI::g_menuAnim);
-    // 📊 Render Info Animation - handled by RenderInfo class
-    RenderInfo::UpdateAnimation(now);
-    
-    // Motion Blur Animation - handled by MotionBlur class
-    MotionBlur::UpdateAnimation(now);
+    // 📊 Render Info + module animations
+    Module::UpdateAnimation(now);
 
-    // ⌨️ Keystrokes Animation - handled by Keystrokes class
-    Keystrokes::UpdateAnimation(now);
-    
     // ⌨️ CPS COUNTER - LMB y RMB
     bool lmbPressed = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
     bool rmbPressed = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
-    
-    // LMB CPS Counter
-    if (lmbPressed && !g_prevLmbPressed) {
-        // Save click timestamp
-        g_lmbClickTimes[g_lmbClickIndex] = now;
-        g_lmbClickIndex = (g_lmbClickIndex + 1) % MAX_CPS_HISTORY;
-        
-        // Count clicks in last 1000ms
-        int count = 0;
-        for (int i = 0; i < MAX_CPS_HISTORY; i++) {
-            if (g_lmbClickTimes[i] > 0 && (now - g_lmbClickTimes[i]) < 1000) {
-                count++;
-            }
-        }
-        g_lmbCps = count;
-    }
-    g_prevLmbPressed = lmbPressed;
-    
-    // RMB CPS Counter
-    if (rmbPressed && !g_prevRmbPressed) {
-        // Save click timestamp
-        g_rmbClickTimes[g_rmbClickIndex] = now;
-        g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;
-        
-        // Count clicks in last 1000ms
-        int count = 0;
-        for (int i = 0; i < MAX_CPS_HISTORY; i++) {
-            if (g_rmbClickTimes[i] > 0 && (now - g_rmbClickTimes[i]) < 1000) {
-                count++;
-            }
-        }
-        g_rmbCps = count;
-    }
-    g_prevRmbPressed = rmbPressed;
+    CPSCounter::UpdateCPS(now, lmbPressed, rmbPressed, Input::g_prevLmbPressed, Input::g_prevRmbPressed);
+    Input::g_prevLmbPressed = lmbPressed;
+    Input::g_prevRmbPressed = rmbPressed;
     
     // CPS Counter Animation - Fade in/out exponencial
     CPSCounter::UpdateAnimation(now);
-    
-    // Watermark Animation (using Watermark class)
-    Watermark::UpdateAnimation(now);
 
     ImGui_ImplDX11_NewFrame();
     // Don't use ImGui_ImplWin32_NewFrame - manual input handling
@@ -640,38 +437,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     const float FADE_IN_TIME = 0.12f;
     const float SLIDE_TIME = 0.25f;
 
-    // Reach module (always visible)
-    Reach::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-    // Hitbox module (using Hitbox class)
-    Hitbox::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-    // AutoSprint module (using AutoSprint class)
-    AutoSprint::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-    // FullBright module (using FullBright class)
-    FullBright::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-    // Timer module (using Timer class)
-        Timer::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-        // Unlock FPS module (using UnlockFPS class)
-        UnlockFPS::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-        // Watermark module (using Watermark class)
-        Watermark::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-        
-        // Show Render Info module (using RenderInfo class)
-        RenderInfo::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-        // Motion Blur module (using MotionBlur class)
-        MotionBlur::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-        // Keystrokes module (using Keystrokes class)
-        Keystrokes::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
-
-        // CPS Counter module (using CPSCounter class)
-        CPSCounter::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
+    Module::RenderArrayList(draw, arrayListStart, yPos, arrayListEnd);
 
     // Debug: Draw ArrayList collision area
     if (g_showMenu) {
@@ -691,17 +457,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
         GUI::RenderMenu(sw, sh);
     }
     
-    // Watermark display (using Watermark class)
-    Watermark::RenderDisplay();
-    
-    // Keystrokes display (using Keystrokes class)
-    Keystrokes::RenderDisplay(sw, sh);
-    
-    // Render Info window (using RenderInfo class)
-    RenderInfo::RenderWindow();
-
-    // CPS counter display
-    CPSCounter::RenderDisplay(sw, sh, g_lmbCps, g_rmbCps);
+    Module::RenderDisplay(sw, sh);
 
     ImGui::Render();
     
@@ -715,18 +471,20 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     return Hook::oPresent(pSwapChain, 0, Flags);
 }
 
-// Hook initialization thread function
-DWORD WINAPI HookInitThread(LPVOID lpReserved) {
+// Startup thread function
+DWORD WINAPI MainThread(LPVOID lpReserved) {
+    UnlockFPS::Initialize();
+    UnlockFPS::SetFPS(60.0f);
     Hook::Initialize();
     return 0;
 }
 
-// Hook initialization delegated to Hook::Initialize()
-
+// Initialization entry point for the DLL
 BOOL WINAPI DllMain(HMODULE hMod, DWORD dwReason, LPVOID lpReserved) {
     if (dwReason == DLL_PROCESS_ATTACH) {
+        g_hModule = hMod;
         DisableThreadLibraryCalls(hMod);
-        CreateThread(0, 0, (LPTHREAD_START_ROUTINE)HookInitThread, 0, 0, 0);
+        CreateThread(NULL, 0, MainThread, NULL, 0, NULL);
     }
     return TRUE;
 }

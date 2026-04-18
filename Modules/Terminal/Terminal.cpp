@@ -1,64 +1,64 @@
 #include "Terminal.hpp"
 #include "Modules/ModuleHeader.hpp"
+#include "Modules/Globals.hpp"
+#include "Config/ConfigManager.hpp"
+#include "Hook/Hook.hpp"
 #include "ImGui/imgui.h"
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <windows.h>
+#include <shlobj.h>
+#define INITGUID
+#include <knownfolders.h>
+#undef INITGUID
+#ifndef KF_FLAG_NO_PACKAGE_REDIRECTION
+#define KF_FLAG_NO_PACKAGE_REDIRECTION 0x00002000
+#endif
 #include <shellapi.h>
 #include <filesystem>
 #include <cstdlib>
 #include <ctime>
+#include "minhook/MinHook.h"
+#include "ImGui/backend/imgui_impl_dx11.h"
+#include "ImGui/backend/imgui_impl_win32.h"
+#include "miniaudio/miniaudio.h"
 
 // Static member initialization
 std::vector<std::string> Terminal::outputLines;
 char Terminal::inputBuffer[256] = {0};
 bool Terminal::scrollToBottom = false;
-std::string Terminal::configDir;
 
-static bool EnsureDirectoryExists(const std::string& directoryPath) {
-    try {
-        std::filesystem::path path(directoryPath);
-        if (std::filesystem::exists(path)) {
-            return std::filesystem::is_directory(path);
-        }
-        return std::filesystem::create_directories(path);
-    } catch (...) {
-        return false;
-    }
+// Unload confirmation dialog state
+static bool g_showUnloadDialog = false;
+
+bool Terminal::SaveConfig(const std::string& name) {
+    return ConfigManager::SaveConfig(name);
+}
+
+bool Terminal::LoadConfig(const std::string& name) {
+    return ConfigManager::LoadConfig(name);
+}
+
+bool Terminal::DeleteConfig(const std::string& name) {
+    return ConfigManager::DeleteConfig(name);
+}
+
+std::vector<std::string> Terminal::ListConfigs() {
+    return ConfigManager::ListConfigs();
+}
+
+bool Terminal::OpenConfigDirectory() {
+    return ConfigManager::OpenConfigDirectory();
 }
 
 void Terminal::Initialize() {
-    try {
-        // Set config directory to %LOCALAPPDATA%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\LocalState\Aegle
-        std::filesystem::path baseDir;
-        char* localAppData = std::getenv("LOCALAPPDATA");
-        if (localAppData && localAppData[0] != '\0') {
-            baseDir = std::filesystem::path(localAppData) /
-                "Packages" /
-                "Microsoft.MinecraftUWP_8wekyb3d8bbwe" /
-                "LocalState" /
-                "Aegle";
-        } else {
-            baseDir = std::filesystem::current_path() / "Aegle";
-        }
-
-        if (!EnsureDirectoryExists(baseDir.string())) {
-            baseDir = std::filesystem::current_path() / "Aegle";
-            EnsureDirectoryExists(baseDir.string());
-        }
-
-        configDir = baseDir.string();
-        if (!configDir.empty() && configDir.back() != '\\' && configDir.back() != '/') {
-            configDir += "\\";
-        }
-    } catch (...) {
-        configDir = (std::filesystem::current_path() / "configs").string();
-        EnsureDirectoryExists(configDir);
-        if (!configDir.empty() && configDir.back() != '\\' && configDir.back() != '/') {
-            configDir += "\\";
-        }
-    }
+    ConfigManager::Initialize();
+    AddOutput("To use commands type .help");
+    AddOutput(".config save <name>      Save the config");
+    AddOutput(".config load <name>      Load existent config");
+    AddOutput(".config delete <name>    Delete the typed config");
+    AddOutput("All configs is saved in %localappdata%\\Packages\\Microsoft.MinecraftUWP_8wekyb3d8bbwe\\LocalState\\Aegle\\");
 }
 
 void Terminal::RenderConsole() {
@@ -94,6 +94,9 @@ void Terminal::RenderConsole() {
             scrollToBottom = true;
         }
     }
+    
+    // Render unload confirmation dialog if active
+    RenderUnloadDialog();
 }
 
 void Terminal::ExecuteCommand(const std::string& command) {
@@ -107,6 +110,7 @@ void Terminal::ExecuteCommand(const std::string& command) {
             AddOutput("Config saved: " + name);
         } else {
             AddOutput("Failed to save config: " + name);
+            
         }
     } else if (command.substr(0, 13) == ".config load ") {
         std::string name = command.substr(13);
@@ -134,9 +138,9 @@ void Terminal::ExecuteCommand(const std::string& command) {
         }
     } else if (command == ".config opendirectory") {
         if (OpenConfigDirectory()) {
-            AddOutput("Opened config directory: " + configDir);
+            AddOutput("Opened config directory: " + ConfigManager::GetConfigDir());
         } else {
-            AddOutput("Failed to open config directory: " + configDir);
+            AddOutput("Failed to open config directory: " + ConfigManager::GetConfigDir());
         }
     } else if (command == ".deattach") {
         AddOutput("Detaching DLL...");
@@ -153,119 +157,18 @@ void Terminal::AddOutput(const std::string& text) {
     }
 }
 
-bool Terminal::SaveConfig(const std::string& name) {
-    try {
-        if (name.empty()) {
-            AddOutput("Config name cannot be empty");
-            return false;
-        }
-
-        nlohmann::json config = CollectCurrentConfig();
-        std::filesystem::path dirPath = std::filesystem::path(configDir);
-        std::filesystem::path filepath = dirPath / (name + ".json");
-        AddOutput("Saving config to: " + filepath.string());
-
-        if (!EnsureDirectoryExists(dirPath.string())) {
-            AddOutput("Failed to create config directory: " + dirPath.string());
-            return false;
-        }
-
-        std::ofstream file(filepath, std::ios::out | std::ios::trunc);
-        if (file.is_open()) {
-            file << config.dump(4);
-            AddOutput("Config saved successfully");
-            return true;
-        }
-
-        AddOutput("Failed to open file for writing: " + filepath.string());
-    } catch (const std::exception& e) {
-        AddOutput("Exception in SaveConfig: " + std::string(e.what()));
-    } catch (...) {
-        AddOutput("Unknown exception in SaveConfig");
-    }
-    return false;
-}
-
-bool Terminal::LoadConfig(const std::string& name) {
-    try {
-        std::filesystem::path filepath = std::filesystem::path(configDir) / (name + ".json");
-        AddOutput("Loading config from: " + filepath.string());
-        std::ifstream file(filepath);
-        if (file.is_open()) {
-            nlohmann::json config;
-            file >> config;
-            ApplyConfig(config);
-            AddOutput("Config loaded successfully");
-            return true;
-        } else {
-            AddOutput("Failed to open file for reading: " + filepath.string());
-        }
-    } catch (const std::exception& e) {
-        AddOutput("Exception in LoadConfig: " + std::string(e.what()));
-    } catch (...) {
-        AddOutput("Unknown exception in LoadConfig");
-    }
-    return false;
-}
-
-bool Terminal::DeleteConfig(const std::string& name) {
-    try {
-        std::string filepath = configDir + name + ".json";
-        AddOutput("Deleting config: " + filepath);
-        std::filesystem::path path = filepath;
-        if (std::filesystem::remove(path)) {
-            AddOutput("Config deleted successfully");
-            return true;
-        } else {
-            AddOutput("Config file not found");
-        }
-    } catch (const std::exception& e) {
-        AddOutput("Exception in DeleteConfig: " + std::string(e.what()));
-    } catch (...) {
-        AddOutput("Unknown exception in DeleteConfig");
-    }
-    return false;
-}
-
-std::vector<std::string> Terminal::ListConfigs() {
-    std::vector<std::string> configs;
-    try {
-        for (const auto& entry : std::filesystem::directory_iterator(configDir)) {
-            if (entry.is_regular_file() && entry.path().extension() == ".json") {
-                configs.push_back(entry.path().stem().string());
-            }
-        }
-    } catch (...) {}
-    return configs;
-}
-
-bool Terminal::OpenConfigDirectory() {
-    try {
-        if (configDir.empty()) {
-            return false;
-        }
-
-        std::filesystem::path dirPath = std::filesystem::path(configDir);
-        if (!std::filesystem::exists(dirPath)) {
-            if (!EnsureDirectoryExists(dirPath.string())) {
-                return false;
-            }
-        }
-
-        HINSTANCE result = ShellExecuteA(NULL, "open", configDir.c_str(), NULL, NULL, SW_SHOWDEFAULT);
-        return reinterpret_cast<intptr_t>(result) > 32;
-    } catch (...) {
-        return false;
-    }
-}
-
 void Terminal::Detach() {
-    // Clean up and unload DLL
-    // This is a simplified version - in a real scenario, you'd need to properly clean up hooks, etc.
-    HMODULE hModule = GetModuleHandle(NULL);
-    if (hModule) {
-        FreeLibrary(hModule);
-    }
+    // Show confirmation dialog
+    g_showUnloadDialog = true;
+    ImGui::OpenPopup("Confirm Unload##UnloadDialog");
+}
+
+void Terminal::PerformUnload() {
+    AddOutput("Unloading DLL...");
+    
+    // Signal to render thread to do cleanup
+    extern bool g_RequestUnload;
+    g_RequestUnload = true;
 }
 
 void Terminal::ShowHelp() {
@@ -279,165 +182,50 @@ void Terminal::ShowHelp() {
     AddOutput("  .deattach                - Detach DLL safely");
 }
 
-nlohmann::json Terminal::CollectCurrentConfig() {
-    nlohmann::json config;
 
-    // Combat modules
-    config["Combat"]["Hitbox"]["enabled"] = Hitbox::g_hitboxEnabled;
-    config["Combat"]["Hitbox"]["value"] = Hitbox::g_hitboxValue;
-
-    config["Combat"]["Reach"]["enabled"] = Reach::IsEnabled();
-    config["Combat"]["Reach"]["value"] = Reach::g_reachValue;
-
-    // Movement modules
-    config["Movement"]["AutoSprint"]["enabled"] = AutoSprint::g_autoSprintEnabled;
-    config["Movement"]["Timer"]["enabled"] = Timer::g_timerEnabled;
-    config["Movement"]["Timer"]["value"] = Timer::g_timerValue;
-
-    // Visuals modules
-    config["Visuals"]["FullBright"]["enabled"] = FullBright::g_fullBrightEnabled;
-    config["Visuals"]["FullBright"]["value"] = FullBright::g_fullBrightValue;
-
-    config["Visuals"]["RenderInfo"]["enabled"] = RenderInfo::g_showRenderInfo;
-    if (RenderInfo::g_renderInfoHud) {
-        config["Visuals"]["RenderInfo"]["position"]["x"] = RenderInfo::g_renderInfoHud->pos.x;
-        config["Visuals"]["RenderInfo"]["position"]["y"] = RenderInfo::g_renderInfoHud->pos.y;
+void Terminal::RenderUnloadDialog() {
+    if (!g_showUnloadDialog) {
+        return;
     }
 
-    config["Visuals"]["Watermark"]["enabled"] = Watermark::g_showWatermark;
-    if (Watermark::g_watermarkHud) {
-        config["Visuals"]["Watermark"]["position"]["x"] = Watermark::g_watermarkHud->pos.x;
-        config["Visuals"]["Watermark"]["position"]["y"] = Watermark::g_watermarkHud->pos.y;
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(400, 180), ImGuiCond_Appearing);
+
+    if (ImGui::BeginPopupModal("Confirm Unload##UnloadDialog", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove)) {
+        ImGui::TextWrapped("Are you sure you want to unload the DLL?");
+        ImGui::TextWrapped("This action will disable Aegleseeker.");
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Buttons
+        float buttonWidth = 120.0f;
+        float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float totalWidth = (buttonWidth * 2) + spacing;
+        float availWidth = ImGui::GetContentRegionAvail().x;
+        float offsetX = (availWidth - totalWidth) / 2.0f;
+
+        if (offsetX > 0) {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + offsetX);
+        }
+
+        if (ImGui::Button("Yes, Unload##UnloadYes", ImVec2(buttonWidth, 0))) {
+            g_showUnloadDialog = false;
+            ImGui::CloseCurrentPopup();
+            Terminal::PerformUnload();
+        }
+
+        ImGui::SetItemDefaultFocus();
+        ImGui::SameLine();
+
+        if (ImGui::Button("Cancel##UnloadNo", ImVec2(buttonWidth, 0))) {
+            g_showUnloadDialog = false;
+            ImGui::CloseCurrentPopup();
+            AddOutput("Unload cancelled.");
+        }
+
+        ImGui::EndPopup();
     }
-
-    config["Visuals"]["MotionBlur"]["enabled"] = MotionBlur::g_motionBlurEnabled;
-    config["Visuals"]["Keystrokes"]["enabled"] = Keystrokes::g_showKeystrokes;
-    if (Keystrokes::g_keystrokesHud) {
-        config["Visuals"]["Keystrokes"]["position"]["x"] = Keystrokes::g_keystrokesHud->pos.x;
-        config["Visuals"]["Keystrokes"]["position"]["y"] = Keystrokes::g_keystrokesHud->pos.y;
-    }
-
-    config["Visuals"]["CPSCounter"]["enabled"] = CPSCounter::g_showCpsCounter;
-    if (CPSCounter::g_cpsHud) {
-        config["Visuals"]["CPSCounter"]["position"]["x"] = CPSCounter::g_cpsHud->pos.x;
-        config["Visuals"]["CPSCounter"]["position"]["y"] = CPSCounter::g_cpsHud->pos.y;
-    }
-
-    // Misc modules
-    config["Misc"]["UnlockFPS"]["enabled"] = UnlockFPS::g_unlockFpsEnabled;
-    config["Misc"]["UnlockFPS"]["fpsLimit"] = UnlockFPS::g_fpsLimit;
-
-    config["version"] = "1.0";
-    config["timestamp"] = std::time(nullptr);
-
-    return config;
-}
-
-void Terminal::ApplyConfig(const nlohmann::json& config) {
-    // Combat modules
-    if (config.contains("Combat")) {
-        if (config["Combat"].contains("Hitbox")) {
-            if (config["Combat"]["Hitbox"].contains("enabled")) {
-                Hitbox::g_hitboxEnabled = config["Combat"]["Hitbox"]["enabled"];
-            }
-            if (config["Combat"]["Hitbox"].contains("value")) {
-                Hitbox::g_hitboxValue = config["Combat"]["Hitbox"]["value"];
-            }
-        }
-        if (config["Combat"].contains("Reach")) {
-            if (config["Combat"]["Reach"].contains("enabled")) {
-                // Note: Reach enabled state is managed by pointer, not directly settable here
-            }
-            if (config["Combat"]["Reach"].contains("value")) {
-                Reach::g_reachValue = config["Combat"]["Reach"]["value"];
-                if (Reach::IsEnabled()) {
-                    Reach::UpdateValue(Reach::g_reachValue);
-                }
-            }
-        }
-    }
-
-    // Movement modules
-    if (config.contains("Movement")) {
-        if (config["Movement"].contains("AutoSprint")) {
-            if (config["Movement"]["AutoSprint"].contains("enabled")) {
-                AutoSprint::g_autoSprintEnabled = config["Movement"]["AutoSprint"]["enabled"];
-            }
-        }
-        if (config["Movement"].contains("Timer")) {
-            if (config["Movement"]["Timer"].contains("enabled")) {
-                Timer::g_timerEnabled = config["Movement"]["Timer"]["enabled"];
-            }
-            if (config["Movement"]["Timer"].contains("value")) {
-                Timer::g_timerValue = config["Movement"]["Timer"]["value"];
-            }
-        }
-    }
-
-    // Visuals modules
-    if (config.contains("Visuals")) {
-        if (config["Visuals"].contains("FullBright")) {
-            if (config["Visuals"]["FullBright"].contains("enabled")) {
-                FullBright::g_fullBrightEnabled = config["Visuals"]["FullBright"]["enabled"];
-            }
-            if (config["Visuals"]["FullBright"].contains("value")) {
-                FullBright::g_fullBrightValue = config["Visuals"]["FullBright"]["value"];
-            }
-        }
-        if (config["Visuals"].contains("RenderInfo")) {
-            if (config["Visuals"]["RenderInfo"].contains("enabled")) {
-                RenderInfo::g_showRenderInfo = config["Visuals"]["RenderInfo"]["enabled"];
-            }
-            if (config["Visuals"]["RenderInfo"].contains("position") && RenderInfo::g_renderInfoHud) {
-                RenderInfo::g_renderInfoHud->pos.x = config["Visuals"]["RenderInfo"]["position"]["x"];
-                RenderInfo::g_renderInfoHud->pos.y = config["Visuals"]["RenderInfo"]["position"]["y"];
-            }
-        }
-        if (config["Visuals"].contains("Watermark")) {
-            if (config["Visuals"]["Watermark"].contains("enabled")) {
-                Watermark::g_showWatermark = config["Visuals"]["Watermark"]["enabled"];
-            }
-            if (config["Visuals"]["Watermark"].contains("position") && Watermark::g_watermarkHud) {
-                Watermark::g_watermarkHud->pos.x = config["Visuals"]["Watermark"]["position"]["x"];
-                Watermark::g_watermarkHud->pos.y = config["Visuals"]["Watermark"]["position"]["y"];
-            }
-        }
-        if (config["Visuals"].contains("MotionBlur")) {
-            if (config["Visuals"]["MotionBlur"].contains("enabled")) {
-                MotionBlur::g_motionBlurEnabled = config["Visuals"]["MotionBlur"]["enabled"];
-            }
-        }
-        if (config["Visuals"].contains("Keystrokes")) {
-            if (config["Visuals"]["Keystrokes"].contains("enabled")) {
-                Keystrokes::g_showKeystrokes = config["Visuals"]["Keystrokes"]["enabled"];
-            }
-            if (config["Visuals"]["Keystrokes"].contains("position") && Keystrokes::g_keystrokesHud) {
-                Keystrokes::g_keystrokesHud->pos.x = config["Visuals"]["Keystrokes"]["position"]["x"];
-                Keystrokes::g_keystrokesHud->pos.y = config["Visuals"]["Keystrokes"]["position"]["y"];
-            }
-        }
-        if (config["Visuals"].contains("CPSCounter")) {
-            if (config["Visuals"]["CPSCounter"].contains("enabled")) {
-                CPSCounter::g_showCpsCounter = config["Visuals"]["CPSCounter"]["enabled"];
-            }
-            if (config["Visuals"]["CPSCounter"].contains("position") && CPSCounter::g_cpsHud) {
-                CPSCounter::g_cpsHud->pos.x = config["Visuals"]["CPSCounter"]["position"]["x"];
-                CPSCounter::g_cpsHud->pos.y = config["Visuals"]["CPSCounter"]["position"]["y"];
-            }
-        }
-    }
-
-    // Misc modules
-    if (config.contains("Misc")) {
-        if (config["Misc"].contains("UnlockFPS")) {
-            if (config["Misc"]["UnlockFPS"].contains("enabled")) {
-                UnlockFPS::g_unlockFpsEnabled = config["Misc"]["UnlockFPS"]["enabled"];
-            }
-            if (config["Misc"]["UnlockFPS"].contains("fpsLimit")) {
-                UnlockFPS::g_fpsLimit = config["Misc"]["UnlockFPS"]["fpsLimit"];
-            }
-        }
-    }
-
-    AddOutput("Configuration applied successfully.");
 }

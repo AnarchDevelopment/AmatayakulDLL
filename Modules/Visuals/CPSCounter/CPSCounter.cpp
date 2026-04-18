@@ -27,11 +27,53 @@ bool CPSCounter::g_cpsCounterFirstRender = false;
 
 HudElement* CPSCounter::g_cpsHud = nullptr;
 
+// CPS Click tracking
+ULONGLONG CPSCounter::g_lmbClickTimes[100] = {};
+ULONGLONG CPSCounter::g_rmbClickTimes[100] = {};
+int CPSCounter::g_lmbClickIndex = 0;
+int CPSCounter::g_rmbClickIndex = 0;
+int CPSCounter::g_lmbCps = 0;
+int CPSCounter::g_rmbCps = 0;
+
 // Forward declarations for easing and HudElement (these will be linked from dllmain.cpp)
 extern bool g_showMenu;
 
 void CPSCounter::Initialize(HudElement* hudElement) {
     g_cpsHud = hudElement;
+}
+
+void CPSCounter::UpdateCPS(ULONGLONG now, bool lmbPressed, bool rmbPressed, bool prevLmbPressed, bool prevRmbPressed) {
+    // LMB CPS Counter
+    if (lmbPressed && !prevLmbPressed) {
+        // Save click timestamp
+        g_lmbClickTimes[g_lmbClickIndex] = now;
+        g_lmbClickIndex = (g_lmbClickIndex + 1) % MAX_CPS_HISTORY;
+        
+        // Count clicks in last 1000ms
+        int count = 0;
+        for (int i = 0; i < MAX_CPS_HISTORY; i++) {
+            if (g_lmbClickTimes[i] > 0 && (now - g_lmbClickTimes[i]) < 1000) {
+                count++;
+            }
+        }
+        g_lmbCps = count;
+    }
+    
+    // RMB CPS Counter
+    if (rmbPressed && !prevRmbPressed) {
+        // Save click timestamp
+        g_rmbClickTimes[g_rmbClickIndex] = now;
+        g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;
+        
+        // Count clicks in last 1000ms
+        int count = 0;
+        for (int i = 0; i < MAX_CPS_HISTORY; i++) {
+            if (g_rmbClickTimes[i] > 0 && (now - g_rmbClickTimes[i]) < 1000) {
+                count++;
+            }
+        }
+        g_rmbCps = count;
+    }
 }
 
 void CPSCounter::UpdateAnimation(ULONGLONG now) {
@@ -79,7 +121,7 @@ void CPSCounter::RenderArrayList(ImDrawList* draw, ImVec2 arrayListStart, float&
     }
 }
 
-void CPSCounter::RenderDisplay(int screenWidth, int screenHeight, int lmbCps, int rmbCps) {
+void CPSCounter::RenderDisplay(int screenWidth, int screenHeight) {
     if (!g_cpsHud) return;
     
     if (g_showCpsCounter || g_cpsCounterAnim > 0.01f) {
@@ -89,7 +131,7 @@ void CPSCounter::RenderDisplay(int screenWidth, int screenHeight, int lmbCps, in
         }
         
         // Calculate text size for collision box
-        std::string cpsText = ProcessCPSCounterFormat(g_cpsCounterFormat, lmbCps, rmbCps);
+        std::string cpsText = ProcessCPSCounterFormat(g_cpsCounterFormat, g_lmbCps, g_rmbCps);
         ImFont* cpsFont = ImGui::GetFont();
         if (cpsFont) {
             float fontSize = 18.0f * g_cpsTextScale;

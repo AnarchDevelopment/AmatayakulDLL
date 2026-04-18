@@ -5,6 +5,12 @@ bool Input::g_keys[256] = {};
 bool Input::g_keysPressed[256] = {};
 bool Input::g_keysReleased[256] = {};
 
+// Mouse button state tracking
+bool Input::g_prevLmbPressed = false;
+bool Input::g_prevRmbPressed = false;
+bool Input::g_lmbPressed = false;
+bool Input::g_rmbPressed = false;
+
 // Virtual key to ImGui key mapping
 ImGuiKey Input::VKToImGuiKey(int vk) {
     switch (vk) {
@@ -119,15 +125,81 @@ void Input::UpdateMouse(HWND window, float screenWidth, float screenHeight, bool
     io.MousePos = ImVec2((float)p.x, (float)p.y);
 
     // Mouse buttons - direct clean read
-    io.MouseDown[0] = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-    io.MouseDown[1] = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+    g_prevLmbPressed = g_lmbPressed;
+    g_prevRmbPressed = g_rmbPressed;
+    
+    g_lmbPressed = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    g_rmbPressed = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+    
+    io.MouseDown[0] = g_lmbPressed;
+    io.MouseDown[1] = g_rmbPressed;
     io.MouseDown[2] = (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
 
     // ImGui cursor ONLY drawn when menu open
     io.MouseDrawCursor = drawCursor;
 }
 
+bool Input::IsLMBPressed() {
+    return g_lmbPressed;
+}
+
+bool Input::IsRMBPressed() {
+    return g_rmbPressed;
+}
+
+bool Input::WasLMBPressed() {
+    return g_prevLmbPressed;
+}
+
+bool Input::WasRMBPressed() {
+    return g_prevRmbPressed;
+}
+
 void Input::Update(HWND window, float screenWidth, float screenHeight, bool menuOpen, bool drawCursor) {
     UpdateKeyboard(menuOpen);
     UpdateMouse(window, screenWidth, screenHeight, drawCursor);
+}
+
+// Static member definitions for input blocking
+HHOOK Input::g_keyboardHook = nullptr;
+
+// Keyboard hook for blocking game input
+int Input::KeyboardBlockHookProc(int nCode, WPARAM wParam, LPARAM lParam, bool menuOpen) {
+    // Allow all input when menu is open
+    if (menuOpen) {
+        return 0;  // Allow
+    }
+    
+    // Block input when menu is closed
+    if (nCode == HC_ACTION) {
+        PKBDLLHOOKSTRUCT pKey = (PKBDLLHOOKSTRUCT)lParam;
+        if (pKey) {
+            // Allow INSERT key
+            if (pKey->vkCode == VK_INSERT) {
+                return 0;  // Allow
+            }
+            // Block other keys
+            return 1;  // Block
+        }
+    }
+    
+    return 0;  // Allow
+}
+
+void Input::BlockGameInput() {
+    // Install hook if needed
+    if (!g_keyboardHook) {
+        HMODULE hMod = GetModuleHandleA("aegledll");
+        if (!hMod) hMod = GetModuleHandleA(nullptr);
+        extern LRESULT CALLBACK KeyboardBlockHookProc(int, WPARAM, LPARAM);
+        g_keyboardHook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardBlockHookProc, hMod, 0);
+    }
+}
+
+void Input::UnblockGameInput() {
+    // Remove keyboard hook
+    if (g_keyboardHook) {
+        UnhookWindowsHookEx(g_keyboardHook);
+        g_keyboardHook = nullptr;
+    }
 }

@@ -1,0 +1,6 @@
+#pragma once
+#define IDR_LOGO 101
+#define IDR_INFO_IMAGE 102
+#define IDR_CLICK_SOUND 103
+#define IDR_CLICK_SOUND_1 104
+#define IDR_CLICK_SOUND_2 105

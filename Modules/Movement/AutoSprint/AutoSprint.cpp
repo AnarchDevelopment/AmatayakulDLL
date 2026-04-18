@@ -1,6 +1,7 @@
 #include "AutoSprint.hpp"
-#include "Animations/Animations.hpp"
-#include "ImGui/imgui.h"
+#include "../../Alloc/AllocateNear.hpp"
+#include "../../../Animations/Animations.hpp"
+#include "../../../ImGui/imgui.h"
 #include <windows.h>
 #include <cstring>
 #include <cstdio>
@@ -14,8 +15,15 @@ BYTE AutoSprint::g_autoSprintBackup[11] = { 0 };
 ULONGLONG AutoSprint::g_autoSprintEnableTime = 0;
 ULONGLONG AutoSprint::g_autoSprintDisableTime = 0;
 
-// Forward declarations for helper functions
-extern void* AllocateNear(uintptr_t reference, size_t size);
+// Pattern scanner - finds byte patterns in memory
+uintptr_t AutoSprint::PatternScan(uintptr_t start, size_t size, const BYTE* pattern, size_t patternSize) {
+    for (size_t i = 0; i <= size - patternSize; ++i) {
+        if (memcmp((void*)(start + i), pattern, patternSize) == 0) {
+            return start + i;
+        }
+    }
+    return 0;
+}
 
 void AutoSprint::Initialize(uintptr_t gameBase) {
     // Pattern scanning for AutoSprint is done in dllmain
@@ -33,7 +41,7 @@ void AutoSprint::Disable() {
 void AutoSprint::Enable() {
     if (!g_autoSprintAddr) return;
     g_autoSprintEnableTime = GetTickCount64();
-    if (!g_autoSprintCave) g_autoSprintCave = AllocateNear(g_autoSprintAddr, 1024);
+    if (!g_autoSprintCave) g_autoSprintCave = AllocateNear::Allocate(g_autoSprintAddr, 1024);
     if (!g_autoSprintCave) return;
 
     memcpy(g_autoSprintBackup, (void*)g_autoSprintAddr, 11);

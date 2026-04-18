@@ -1,10 +1,30 @@
+param(
+    [ValidateSet("--debug", "--release")]
+    [string]$BuildType = "--release"
+)
+
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
+function Write-Log([string]$Msg, [string]$Type = "Info") {
+    $Colors = @{ "Info" = "Cyan"; "Success" = "Green"; "Warn" = "Yellow"; "Error" = "Red"; "Link" = "Magenta" }
+    $Icons  = @{ "Info" = "[i]"; "Success" = "[+]"; "Warn" = "[!]"; "Error" = "[X]"; "Link" = "[>]" }
+    
+    $Color = if ($Colors.ContainsKey($Type)) { $Colors[$Type] } else { "White" }
+    $Icon  = if ($Icons.ContainsKey($Type)) { $Icons[$Type] } else { "[-]" }
+
+    Write-Host ("{0} {1}" -f $Icon, $Msg) -ForegroundColor $Color
+}
 
 $ProjectName = "AegleInternal"
 $BuildDir    = "obj"
-$BinDir      = "build"
-$Output      = Join-Path $BinDir "internal_hook.dll"
+
+# Set output directory based on build type
+if ($BuildType -eq "--debug") {
+    $BinDir = "build/Debug"
+} else {
+    $BinDir = "build/Release"
+}
+$Output      = Join-Path $BinDir "aegledll.dll"
 
 $Sources =  "dllmain.cpp", 
             "ImGui/imgui.cpp", 
@@ -13,6 +33,9 @@ $Sources =  "dllmain.cpp",
             "ImGui/imgui_tables.cpp", `
             "ImGui/backend/imgui_impl_dx11.cpp", 
             "ImGui/backend/imgui_impl_win32.cpp", 
+            "Modules/Alloc/AllocateNear.cpp",
+            "Modules/PatternScan/PatternScan.cpp",
+            "Config/ConfigManager.cpp",
             "Modules/Combat/Reach/Reach.cpp",
             "Modules/Combat/Hitbox/Hitbox.cpp",
             "Modules/Movement/AutoSprint/AutoSprint.cpp",
@@ -25,27 +48,31 @@ $Sources =  "dllmain.cpp",
             "Modules/Visuals/CPSCounter/CPSCounter.cpp",
             "Modules/Misc/UnlockFPS/UnlockFPS.cpp",
             "Modules/Terminal/Terminal.cpp",
+            "Modules/Info/Info.cpp",
+            "Modules/ModuleManager.cpp",
             "GUI/GUI.cpp",
+            "GUI/DX11/ImGuiRenderer.cpp",
             "Hook/Hook.cpp",
             "Input/Input.cpp",
             "Animations/Animations.cpp",
+            "Assets/stb/stb_image_impl.cpp",
             "minhook/buffer.c", 
             "minhook/hook.c", 
             "minhook/trampoline.c", 
             "minhook/hde64.c"
-# -static tag can cause issues with some libraries, so we will only use it for the final linking step   
-$Flags = "-O2", "-s", "-fpermissive", "-m64", "-march=x86-64", "-static", "-static-libgcc", "-static-libstdc++", "-I."
-$Libs  = "-ld3d11", "-ldxgi", "-ld3dcompiler", "-ldwmapi", "-limm32", "-luser32", "-lgdi32", "-lpsapi"
 
-function Write-Log([string]$Msg, [string]$Type = "Info") {
-    $Colors = @{ "Info" = "Cyan"; "Success" = "Green"; "Warn" = "Yellow"; "Error" = "Red"; "Link" = "Magenta" }
-    $Icons  = @{ "Info" = "[i]"; "Success" = "[+]"; "Warn" = "[!]"; "Error" = "[X]"; "Link" = "[>]" }
-    
-    $Color = if ($Colors.ContainsKey($Type)) { $Colors[$Type] } else { "White" }
-    $Icon  = if ($Icons.ContainsKey($Type)) { $Icons[$Type] } else { "[-]" }
+$ResourceFile = "Assets/resources.rc"
 
-    Write-Host ("{0} {1}" -f $Icon, $Msg) -ForegroundColor $Color
+# Compilation flags based on build type
+if ($BuildType -eq "--debug") {
+    Write-Log "Building in DEBUG mode..." "Info"
+    $Flags = "-g", "-O0", "-fpermissive", "-m64", "-march=x86-64", "-static", "-static-libgcc", "-static-libstdc++", "-I."
+} else {
+    Write-Log "Building in RELEASE mode..." "Info"
+    $Flags = "-O2", "-s", "-fpermissive", "-m64", "-march=x86-64", "-static", "-static-libgcc", "-static-libstdc++", "-I."
 }
+
+$Libs  = "-ld3d11", "-ldxgi", "-ld3dcompiler", "-ldwmapi", "-limm32", "-luser32", "-lgdi32", "-lpsapi", "-lshell32", "-lole32"
 
 Clear-Host
 Write-Log "Starting Build of $ProjectName (x64)..." "Info"
@@ -79,6 +106,23 @@ foreach ($File in $Sources) {
         }
     }
 }
+
+# Compile resource file
+$ResourceObj = Join-Path $BuildDir "resources.o"
+if (!(Test-Path $BuildDir)) { New-Item -ItemType Directory -Path $BuildDir | Out-Null }
+
+if (!(Test-Path $ResourceObj) -or (Get-Item $ResourceFile).LastWriteTime -gt (Get-Item $ResourceObj).LastWriteTime) {
+    Write-Log "Compiling resource file: $ResourceFile" "Warn"
+    
+    & windres.exe $ResourceFile -O coff -o $ResourceObj 2>&1 | Tee-Object -Variable Err | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Log "Fatal error compiling resources." "Error"
+        Write-Host ($Err | Out-String) -ForegroundColor Gray
+        exit 1
+    }
+}
+
+$ObjectFiles += $ResourceObj
 
 Write-Log "Linking binary in directory: $BinDir" "Link"
 & g++ -shared -o $Output $ObjectFiles $Flags $Libs

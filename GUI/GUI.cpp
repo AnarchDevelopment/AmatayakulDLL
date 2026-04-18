@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <cmath>
 
+
 // Static member initialization
 bool GUI::g_showMenu = false;
 float GUI::g_menuAnim = 0.0f;
@@ -85,6 +86,22 @@ void GUI::ApplyTheme() {
     style.WindowBorderSize = 1.0f;
 }
 
+void GUI::LoadFont() {
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = NULL;
+
+    ImFontConfig cfg;
+    cfg.OversampleH = 3;
+    cfg.OversampleV = 3;
+    cfg.PixelSnapH = true;
+
+    io.Fonts->AddFontFromFileTTF(
+        "C:\\Windows\\Fonts\\arial.ttf",
+        17.0f,
+        &cfg
+    );
+}
+
 // External vars from dllmain.cpp
 extern bool g_showMenu;
 extern ULONGLONG g_notifStart;
@@ -135,7 +152,14 @@ void GUI::RenderMenu(float screenWidth, float screenHeight) {
         ImGui::SetNextWindowSize(ImVec2(bS.x * sc, bS.y * sc), ImGuiCond_Always);
         ImGui::SetNextWindowPos(ImVec2(screenWidth / 2, screenHeight / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-        if (ImGui::Begin("Aegleseeker Config", &g_showMenu, ImGuiWindowFlags_NoCollapse)) {
+        if (ImGui::Begin("Aegleseeker Config", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize)) {
+            // Centered title
+            ImVec2 windowSize = ImGui::GetWindowSize();
+            float titleWidth = ImGui::CalcTextSize("Aegleseeker Config").x;
+            ImGui::SetCursorPosX((windowSize.x - titleWidth) * 0.5f);
+            ImGui::Text("Aegleseeker Config");
+            ImGui::Separator();
+            
             // Estilos mejorados para la interfaz
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 3.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
@@ -245,6 +269,22 @@ void GUI::RenderMenu(float screenWidth, float screenHeight) {
                     ImGui::PopStyleVar();
                     ImGui::EndTabItem();
                 }
+                if (ImGui::BeginTabItem("Info")) {
+                    g_currentTab = 5;
+                    if (g_currentTab != prevTab) {
+                        g_tabChangeTime = GetTickCount64();
+                        g_tabAnim = 0.0f;
+                        g_previousTab = prevTab;
+                    }
+                    
+                    float alphaFade = (g_tabChangeTime > 0) ? Animations::SmoothInertia(g_tabAnim) : 1.0f;
+                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alphaFade);
+                    
+                    Info::RenderMenu();
+                    
+                    ImGui::PopStyleVar();
+                    ImGui::EndTabItem();
+                }
                 ImGui::EndTabBar();
             }
             
@@ -267,7 +307,7 @@ void GUI::RenderNotification(float screenWidth, float screenHeight) {
         // Entry: 0-0.6s, Display: 0.6-4.0s, Exit: 4.0-5.0s
         float nT = tNotif < 0.6f ? tNotif / 0.6f : (tNotif > 4.0f ? 1.0f - (tNotif - 4.0f) / 1.0f : 1.0f);
         float nE = Animations::SmoothInertia(nT) * 255.0f;
-        ImVec2 nS = ImVec2(320, 70);
+        ImVec2 nS = ImVec2(320, 90);
         ImGui::SetNextWindowPos(ImVec2(screenWidth - ((nS.x + 20.0f) * nE / 255.0f), screenHeight - nS.y - 20.0f));
         ImGui::SetNextWindowSize(nS);
         ImGui::Begin("##Notif", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoInputs);

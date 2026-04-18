@@ -1,5 +1,6 @@
 #include "RenderInfo.hpp"
 #include "../../../Animations/Animations.hpp"
+#include "../../../Modules/Misc/UnlockFPS/UnlockFPS.hpp"
 #include "../../../Utils/HudElement.hpp"
 #include "../../../ImGui/imgui.h"
 #include <windows.h>
@@ -118,7 +119,11 @@ void RenderInfo::RenderWindow() {
             }
             
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.5f, easedAnim));
-            ImGui::Text("FPS: %.0f", g_fpsCounter);
+            if (UnlockFPS::g_unlockFpsEnabled) {
+                ImGui::Text("FPS: %.0f (target %.0f)", g_fpsCounter, UnlockFPS::g_fpsLimit);
+            } else {
+                ImGui::Text("FPS: %.0f", g_fpsCounter);
+            }
             ImGui::Text("Render: DX11");
             ImGui::Text("OS: Windows");
             ImGui::Text("Build: Release");

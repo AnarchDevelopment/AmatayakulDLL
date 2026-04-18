@@ -4,6 +4,7 @@
 #include <d3d11.h>
 #include <dxgi.h>
 
+
 // Forward declarations
 struct IDXGISwapChain;
 
@@ -12,6 +13,7 @@ class Hook {
 public:
     // Initialization
     static void Initialize();
+    static void Shutdown();
     
     // DX11 hook callbacks
     static HRESULT STDMETHODCALLTYPE hkPresent(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags);

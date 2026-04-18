@@ -34,4 +34,6 @@ private:
     static void ShowHelp();
     static nlohmann::json CollectCurrentConfig();
     static void ApplyConfig(const nlohmann::json& config);
+    static void RenderUnloadDialog();
+    static void PerformUnload();
 };

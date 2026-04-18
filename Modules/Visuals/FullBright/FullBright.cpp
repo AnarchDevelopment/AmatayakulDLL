@@ -1,5 +1,6 @@
 #include "FullBright.hpp"
 #include "../../../Animations/Animations.hpp"
+#include "../../Alloc/AllocateNear.hpp"
 #include "../../../ImGui/imgui.h"
 #include <windows.h>
 #include <cstring>
@@ -14,9 +15,6 @@ void* FullBright::g_fullBrightCave = nullptr;
 BYTE FullBright::g_fullBrightBackup[8] = { 0 };
 ULONGLONG FullBright::g_fullBrightEnableTime = 0;
 ULONGLONG FullBright::g_fullBrightDisableTime = 0;
-
-// Forward declarations for helper functions
-extern void* AllocateNear(uintptr_t reference, size_t size);
 
 void FullBright::Initialize(uintptr_t gameBase) {
     // Pattern scanning for FullBright is done in dllmain
@@ -34,7 +32,7 @@ void FullBright::Disable() {
 void FullBright::Enable() {
     if (!g_fullBrightAddr) return;
     g_fullBrightEnableTime = GetTickCount64();
-    if (!g_fullBrightCave) g_fullBrightCave = AllocateNear(g_fullBrightAddr, 1024);
+    if (!g_fullBrightCave) g_fullBrightCave = AllocateNear::Allocate(g_fullBrightAddr, 1024);
     if (!g_fullBrightCave) return;
 
     memcpy(g_fullBrightBackup, (void*)g_fullBrightAddr, 8);

@@ -32,14 +32,24 @@ public:
     static float g_cpsCounterY;
     static bool g_cpsCounterFirstRender;
     
+    // CPS Click tracking
+    static const int MAX_CPS_HISTORY = 100;
+    static ULONGLONG g_lmbClickTimes[100];
+    static ULONGLONG g_rmbClickTimes[100];
+    static int g_lmbClickIndex;
+    static int g_rmbClickIndex;
+    static int g_lmbCps;
+    static int g_rmbCps;
+    
     // HUD Element
     static HudElement* g_cpsHud;
     
     // Methods
     static void Initialize(HudElement* hudElement);
     static void UpdateAnimation(ULONGLONG now);
+    static void UpdateCPS(ULONGLONG now, bool lmbPressed, bool rmbPressed, bool g_prevLmbPressed, bool g_prevRmbPressed);
     static void RenderArrayList(class ImDrawList* draw, ImVec2 arrayListStart, float& yPos, ImVec2& arrayListEnd);
-    static void RenderDisplay(int screenWidth, int screenHeight, int g_lmbCps, int g_rmbCps);
+    static void RenderDisplay(int screenWidth, int screenHeight);
     static void RenderMenu();
     
     // Helper

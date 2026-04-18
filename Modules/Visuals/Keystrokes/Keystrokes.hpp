@@ -75,8 +75,11 @@ public:
     // Additional keystrokes config
     static bool g_keystrokesShowSpacebar;
     static float g_keystrokesSpacebarWidth;
+    static float g_keystrokesSpacebarHeight;
     static bool g_keystrokesShowMouseButtons;
     static bool g_keystrokesShowLMBRMB;
+    static std::string g_keystrokesLMBFormatText;
+    static std::string g_keystrokesRMBFormatText;
 
     // CPS tracking
     static std::vector<ULONGLONG> g_lmbClickTimes;
@@ -99,6 +102,9 @@ public:
 
     /// @brief Render keystrokes display
     static void RenderDisplay(float sw, float sh);
+
+    /// @brief Process keystrokes format string
+    static std::string ProcessKeystrokesFormat(const std::string& format, int value);
 
     /// @brief Render menu controls for keystrokes settings
     static void RenderMenu();

@@ -18,6 +18,7 @@ public:
     
     // Style and theme
     static void ApplyTheme();
+    static void LoadFont();
     
     // Menu animation update
     static void UpdateAnimation(ULONGLONG now, float dt);

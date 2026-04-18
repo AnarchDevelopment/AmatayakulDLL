@@ -20,4 +20,6 @@ public:
     static void UpdateFPS();
     static void RenderArrayList(class ImDrawList* draw, ImVec2 arrayListStart, float& yPos, ImVec2& arrayListEnd);
     static void RenderMenu();
+    static void SetFPS(float fps);
+    static float GetFPS();
 };

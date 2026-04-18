@@ -68,6 +68,10 @@ float Keystrokes::g_keystrokesSpacebarWidth = 1.0f;
 bool Keystrokes::g_keystrokesShowMouseButtons = true;
 bool Keystrokes::g_keystrokesShowLMBRMB = true;
 
+float Keystrokes::g_keystrokesSpacebarHeight = 0.09f;
+std::string Keystrokes::g_keystrokesLMBFormatText = "{value} CPS";
+std::string Keystrokes::g_keystrokesRMBFormatText = "{value} CPS";
+
 // CPS tracking for LMB and RMB
 std::vector<ULONGLONG> Keystrokes::g_lmbClickTimes(10, 0);
 std::vector<ULONGLONG> Keystrokes::g_rmbClickTimes(10, 0);
@@ -666,4 +670,19 @@ void Keystrokes::RenderMenu() {
         ImGui::Checkbox("Show Spacebar##KS", &g_keystrokesShowSpacebar);
         ImGui::SliderFloat("Spacebar Width##KS", &g_keystrokesSpacebarWidth, 0.1f, 2.0f, "%.2f");
     }
+}
+
+std::string Keystrokes::ProcessKeystrokesFormat(const std::string& format, int value) {
+    std::string result = format;
+    std::string formatUpper = format;
+    for (char& c : formatUpper) c = std::toupper(c);
+    
+    size_t pos = formatUpper.find("{VALUE}");
+    if (pos != std::string::npos) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%d", value);
+        result.replace(pos, 7, buffer);
+    }
+    
+    return result;
 }

@@ -32,4 +32,7 @@ public:
 
     // Check if autosprint is enabled
     static bool IsEnabled() { return g_autoSprintEnabled; }
+
+    // Pattern scanning utility
+    static uintptr_t PatternScan(uintptr_t start, size_t size, const BYTE* pattern, size_t patternSize);
 };
