@@ -2,6 +2,7 @@
 #include "../../../Animations/Animations.hpp"
 #include "../../../Utils/HudElement.hpp"
 #include "../../../ImGui/imgui.h"
+#include "../../../GUI/GUI.hpp"
 #include <windows.h>
 #include <cmath>
 #include <cstdio>
@@ -113,18 +114,18 @@ void Watermark::RenderDisplay() {
         ImFont* font = ImGui::GetFont();
         for (int i = 3; i >= 1; --i) {
             glowColor.w = (chromaColor.w * 0.4f) / i;
-            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x + i, textPos.y), ImGui::GetColorU32(glowColor), "Aegleseeker");
-            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x - i, textPos.y), ImGui::GetColorU32(glowColor), "Aegleseeker");
-            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x, textPos.y + i), ImGui::GetColorU32(glowColor), "Aegleseeker");
-            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x, textPos.y - i), ImGui::GetColorU32(glowColor), "Aegleseeker");
+            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x + i, textPos.y), ImGui::GetColorU32(glowColor), "Amatayakul");
+            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x - i, textPos.y), ImGui::GetColorU32(glowColor), "Amatayakul");
+            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x, textPos.y + i), ImGui::GetColorU32(glowColor), "Amatayakul");
+            watermarkDraw->AddText(font, fontSize, ImVec2(textPos.x, textPos.y - i), ImGui::GetColorU32(glowColor), "Amatayakul");
         }
         
         // Main text with chroma color - 2x bigger
-        watermarkDraw->AddText(font, fontSize, textPos, ImGui::GetColorU32(chromaColor), "Aegleseeker");
+        watermarkDraw->AddText(font, fontSize, textPos, ImGui::GetColorU32(chromaColor), "Amatayakul");
 
         // Update hitbox size based on actual fontSize (32pt = 2x scale of default 16pt)
         float fontScale = fontSize / 16.0f;  // Calculate scale factor
-        ImVec2 textSize = ImGui::CalcTextSize("Aegleseeker");
+        ImVec2 textSize = ImGui::CalcTextSize("Amatayakul");
         g_watermarkHud->size = ImVec2(textSize.x * fontScale + 20, textSize.y * fontScale + 10);
 
         // DEBUG: show hitbox only when menu is open
@@ -140,5 +141,5 @@ void Watermark::RenderDisplay() {
 
 void Watermark::RenderMenu() {
     // Show Watermark
-    ImGui::Checkbox("Watermark", &g_showWatermark);
+    GUI::ToggleButton("Watermark", &g_showWatermark);
 }

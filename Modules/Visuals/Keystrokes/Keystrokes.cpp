@@ -603,38 +603,38 @@ void Keystrokes::RenderMenu() {
         ImGui::Text("Keystrokes Colors");
         
         // Background Colors
-        ImGui::ColorEdit4("Background Disabled##KS", (float*)&g_keystrokesBgColor);
-        ImGui::ColorEdit4("Background Enabled##KS", (float*)&g_keystrokesEnabledColor);
+        ImGui::ColorEdit4("Background Disabled##KS", (float*)&g_keystrokesBgColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::ColorEdit4("Background Enabled##KS", (float*)&g_keystrokesEnabledColor, ImGuiColorEditFlags_NoInputs);
         
         // Text Colors
-        ImGui::ColorEdit4("Text Disabled##KS", (float*)&g_keystrokesTextColor);
-        ImGui::ColorEdit4("Text Enabled##KS", (float*)&g_keystrokesTextEnabledColor);
+        ImGui::ColorEdit4("Text Disabled##KS", (float*)&g_keystrokesTextColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::ColorEdit4("Text Enabled##KS", (float*)&g_keystrokesTextEnabledColor, ImGuiColorEditFlags_NoInputs);
         
         ImGui::Separator();
         ImGui::Text("Advanced Effects");
         
         // Background Shadow Color
         if (g_keystrokesShowBg && g_keystrokesRectShadow) {
-            ImGui::ColorEdit4("Background Shadow Color##KS", (float*)&g_keystrokesRectShadowColor);
+            ImGui::ColorEdit4("Background Shadow Color##KS", (float*)&g_keystrokesRectShadowColor, ImGuiColorEditFlags_NoInputs);
         }
         
         // Text Shadow Color
         if (g_keystrokesTextShadow) {
-            ImGui::ColorEdit4("Text Shadow Color##KS", (float*)&g_keystrokesTextShadowColor);
+            ImGui::ColorEdit4("Text Shadow Color##KS", (float*)&g_keystrokesTextShadowColor, ImGuiColorEditFlags_NoInputs);
         }
         
         // Border Color
         if (g_keystrokesBorder) {
-            ImGui::ColorEdit4("Border Color##KS", (float*)&g_keystrokesBorderColor);
+            ImGui::ColorEdit4("Border Color##KS", (float*)&g_keystrokesBorderColor, ImGuiColorEditFlags_NoInputs);
         }
         
         // Glow Colors
         if (g_keystrokesGlow) {
-            ImGui::ColorEdit4("Glow Color (Disabled)##KS", (float*)&g_keystrokesGlowColor);
+            ImGui::ColorEdit4("Glow Color (Disabled)##KS", (float*)&g_keystrokesGlowColor, ImGuiColorEditFlags_NoInputs);
         }
 
         if (g_keystrokesGlowEnabled) {
-            ImGui::ColorEdit4("Glow Color (Enabled)##KS", (float*)&g_keystrokesGlowEnabledColor);
+            ImGui::ColorEdit4("Glow Color (Enabled)##KS", (float*)&g_keystrokesGlowEnabledColor, ImGuiColorEditFlags_NoInputs);
         }
         
         ImGui::Separator();

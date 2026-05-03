@@ -3,6 +3,7 @@
 #include "../../../Modules/Misc/UnlockFPS/UnlockFPS.hpp"
 #include "../../../Utils/HudElement.hpp"
 #include "../../../ImGui/imgui.h"
+#include "../../../GUI/GUI.hpp"
 #include <windows.h>
 #include <cstdio>
 #include <cmath>
@@ -112,18 +113,7 @@ void RenderInfo::RenderWindow() {
         }
         
         if (ImGui::Begin("##RenderInfo", nullptr, flags)) {
-            ImGuiIO& io = ImGui::GetIO();
-            // Calculate real FPS from delta time
-            if (io.DeltaTime > 0.0f) {
-                g_fpsCounter = 1.0f / io.DeltaTime;
-            }
-            
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.0f, 1.0f, 0.5f, easedAnim));
-            if (UnlockFPS::g_unlockFpsEnabled) {
-                ImGui::Text("FPS: %.0f (target %.0f)", g_fpsCounter, UnlockFPS::g_fpsLimit);
-            } else {
-                ImGui::Text("FPS: %.0f", g_fpsCounter);
-            }
             ImGui::Text("Render: DX11");
             ImGui::Text("OS: Windows");
             ImGui::Text("Build: Release");
@@ -152,5 +142,5 @@ void RenderInfo::RenderWindow() {
 
 void RenderInfo::RenderMenu() {
     // Show Render Info
-    ImGui::Checkbox("Render Info", &g_showRenderInfo);
+    GUI::ToggleButton("Render Info", &g_showRenderInfo);
 }

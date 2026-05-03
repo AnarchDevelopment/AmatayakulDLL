@@ -224,7 +224,7 @@ void CPSCounter::RenderMenu() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.8f);
         
         // Color picker
-        ImGui::ColorEdit4("CPS Text Color##CPSCounter", (float*)&g_cpsTextColor);
+        ImGui::ColorEdit4("CPS Text Color##CPSCounter", (float*)&g_cpsTextColor, ImGuiColorEditFlags_NoInputs);
         
         // Format string
         if (!g_cpsCounterFirstRender) {
@@ -247,7 +247,7 @@ void CPSCounter::RenderMenu() {
         GUI::ToggleButton("CPS Text Shadow##CPSCounter", &g_cpsCounterShadow);
         if (g_cpsCounterShadow) {
             ImGui::SliderFloat("CPS Shadow Offset##CPSCounter", &g_cpsCounterShadowOffset, 0.0f, 10.0f, "%.1f");
-            ImGui::ColorEdit4("CPS Shadow Color##CPSCounter", (float*)&g_cpsCounterShadowColor);
+            ImGui::ColorEdit4("CPS Shadow Color##CPSCounter", (float*)&g_cpsCounterShadowColor, ImGuiColorEditFlags_NoInputs);
         }
         
         ImGui::PopStyleVar();  // Alpha
