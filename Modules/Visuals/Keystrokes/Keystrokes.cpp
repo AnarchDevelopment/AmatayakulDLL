@@ -70,8 +70,8 @@ bool Keystrokes::g_keystrokesShowMouseButtons = true;
 bool Keystrokes::g_keystrokesShowLMBRMB = true;
 
 float Keystrokes::g_keystrokesSpacebarHeight = 0.09f;
-std::string Keystrokes::g_keystrokesLMBFormatText = "{value} CPS";
-std::string Keystrokes::g_keystrokesRMBFormatText = "{value} CPS";
+std::string Keystrokes::g_keystrokesLMBFormatText = "{lmb} CPS";
+std::string Keystrokes::g_keystrokesRMBFormatText = "{rmb} CPS";
 
 // CPS tracking for LMB and RMB
 std::vector<ULONGLONG> Keystrokes::g_lmbClickTimes(MAX_CPS_HISTORY, 0);
@@ -396,11 +396,11 @@ void Keystrokes::RenderDisplay(float sw, float sh) {
                 }
                 g_lmbCps = count;
                 
-                // Track CPS for RMB (with debounce)
+                // Track CPS for RMB (with debounce) - FIXED: Use correct RMB variables
                 if (rmbPressed && !g_prevRmbPressed) {
                     if (now - g_lastRmbClickTime > 50) {
-                        g_rmbClickTimes[g_rmbClickIndex] = now;
-                        g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;
+                        g_rmbClickTimes[g_rmbClickIndex] = now;  // FIXED: Use g_rmbClickIndex (RMB index) for RMB array
+                        g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;  // FIXED: Update g_rmbClickIndex (RMB index)
                         g_lastRmbClickTime = now;
                     }
                 }
