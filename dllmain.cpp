@@ -100,6 +100,7 @@ HudElement g_renderInfoHud = { ImVec2(10, 100), ImVec2(220, 120) };
 HudElement g_arrayListHud = { ImVec2(0, 10), ImVec2(300, 400) };
 HudElement g_keystrokesHud = { ImVec2(30, 0), ImVec2(140, 150) };
 HudElement g_cpsHud = { ImVec2(500, 400), ImVec2(80, 30) };  // Will be initialized in CPSCounter
+HudElement g_fpsHud = { ImVec2(0, 0), ImVec2(80, 30) };  // Will be initialized in FPSCounter
 
 // Input blocking
 
@@ -152,17 +153,8 @@ void ImageWithOpacity(ID3D11ShaderResourceView* srv, ImVec2 size, float opacity)
 // --- 🏃 AUTOSPRINT ---
 // --- 🖱️ INPUT HOOKS DELEGADOS A Hook.cpp ---
 
+// WndProc hook removed for simplicity - menu input handled via ImGui_ImplWin32_NewFrame
 LRESULT CALLBACK hkWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    if (g_showMenu) {
-        // Don't pass to ImGui - manual input handling
-        // Only blocks input when menu is open
-        switch (uMsg) {
-            case WM_MOUSEMOVE: case WM_LBUTTONDOWN: case WM_LBUTTONUP:
-            case WM_RBUTTONDOWN: case WM_RBUTTONUP: case WM_MBUTTONDOWN:
-            case WM_MBUTTONUP: case WM_MOUSEWHEEL: case WM_INPUT: 
-                return 1;
-        }
-    }
     return CallWindowProc(oWndProc, hWnd, uMsg, wParam, lParam);
 }
 
@@ -178,51 +170,55 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     // Force VSync OFF when disabled
     if (!g_vsync)
         SyncInterval = 0;
-        
+    
     if (!pDevice) {
-        if (SUCCEEDED(pSwapChain->GetDevice(__uuidof(ID3D11Device), (void**)&pDevice))) {
+        // Safety: check pSwapChain is valid
+        if (!pSwapChain) {
+            return Hook::oPresent(pSwapChain, SyncInterval, Flags);
+        }
+        
+        ID3D11Device* tempDevice = NULL;
+        if (SUCCEEDED(pSwapChain->GetDevice(__uuidof(ID3D11Device), (void**)&tempDevice))) {
+            pDevice = tempDevice;
             pDevice->GetImmediateContext(&pContext);
-            DXGI_SWAP_CHAIN_DESC sd;
-            pSwapChain->GetDesc(&sd);
-            g_window = sd.OutputWindow;
+            DXGI_SWAP_CHAIN_DESC sd = {0};
+            if (SUCCEEDED(pSwapChain->GetDesc(&sd))) {
+                g_window = sd.OutputWindow;
+            }
             if (!g_window) g_window = GetForegroundWindow();
-
+            
+            // Initialize ImGui
             ImGui::CreateContext();
-            ImGui_ImplWin32_Init(g_window);
-            ImGui_ImplDX11_Init(pDevice, pContext);
-            
-            // Cargar fuente personalizada
-            GUI::LoadFont();
-            ImGui_ImplDX11_CreateDeviceObjects();
-            
-            // 🎨 APLICAR TEMA
-            GUI::ApplyTheme();
-            
-            // Inicializar watermark para que aparezca por defecto
-            Watermark::g_watermarkEnableTime = GetTickCount64();
-            Watermark::g_watermarkAnim = 1.0f;
-            
-            oWndProc = (WNDPROC)SetWindowLongPtr(g_window, GWLP_WNDPROC, (LONG_PTR)hkWndProc);
-            
-            g_gameBase = (uintptr_t)GetModuleHandleA(NULL);
-            Module::Initialize(g_gameBase, &g_renderInfoHud, &g_watermarkHud, &g_keystrokesHud, &g_cpsHud);
-
-            HMODULE hModule = GetModuleHandleA(NULL);
-            MODULEINFO mi;
-            GetModuleInformation(GetCurrentProcess(), hModule, &mi, sizeof(mi));
-            if (!AutoSprint::g_autoSprintAddr) {
-                BYTE pattern[] = {0x0F, 0xB6, 0x41, 0x63, 0x48, 0x8D, 0x2D, 0x39, 0xE0, 0xC3, 0x00};
-                AutoSprint::g_autoSprintAddr = PatternScan::Scan(g_gameBase, mi.SizeOfImage, pattern, sizeof(pattern));
+            if (ImGui_ImplWin32_Init(g_window) && ImGui_ImplDX11_Init(pDevice, pContext)) {
+                // Cargar fuente personalizada
+                GUI::LoadFont();
+                ImGui_ImplDX11_CreateDeviceObjects();
+                
+                // 🎨 APLICAR TEMA
+                GUI::ApplyTheme();
+                
+                // Inicializar watermark para que aparezca por defecto
+                Watermark::g_watermarkEnableTime = GetTickCount64();
+                Watermark::g_watermarkAnim = 1.0f;
+                
+                // WndProc hook removed for simplicity - ImGui handles input via ImGui_ImplWin32_NewFrame
+                
+                g_gameBase = (uintptr_t)GetModuleHandleA(NULL);
+                Module::Initialize(g_gameBase, &g_renderInfoHud, &g_watermarkHud, &g_keystrokesHud, &g_cpsHud, &g_fpsHud);
+                
+                g_notifStart = GetTickCount64();
+                g_lastTime = GetTickCount64();
+            } else {
+                // Cleanup on ImGui init failure
+                if (ImGui::GetCurrentContext()) {
+                    ImGui::DestroyContext();
+                }
+                pDevice->Release();
+                pDevice = NULL;
+                return Hook::oPresent(pSwapChain, SyncInterval, Flags);
             }
-
-            // Scan for FullBright pattern
-            if (!FullBright::g_fullBrightAddr) {
-                BYTE pattern[] = {0xF3, 0x0F, 0x10, 0x80, 0xA0, 0x01, 0x00, 0x00};
-                FullBright::g_fullBrightAddr = PatternScan::Scan(g_gameBase, mi.SizeOfImage, pattern, sizeof(pattern));
-            }
-
-            g_notifStart = GetTickCount64();
-            g_lastTime = GetTickCount64();
+        } else {
+            return Hook::oPresent(pSwapChain, SyncInterval, Flags);
         }
     }
 
@@ -233,6 +229,11 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
         pBackBuffer->GetDesc(&desc);
         sw = (float)desc.Width; 
         sh = (float)desc.Height;
+        
+        // Update ImGui display size every frame to fix mouse alignment on window resize
+        ImGuiIO& io = ImGui::GetIO();
+        io.DisplaySize = ImVec2(sw, sh);
+        
         if (!mainRenderTargetView) pDevice->CreateRenderTargetView(pBackBuffer, NULL, &mainRenderTargetView);
         
         // Motion blur - capture frame
@@ -240,11 +241,11 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
             // Calculate max frames by blur type
             int maxFrames = 1;
             if (MotionBlur::g_blurType == "Time Aware Blur") {
-                maxFrames = (int)round(MotionBlur::g_maxHistoryFrames);  // Usar g_maxHistoryFrames para Time Aware
+                maxFrames = (int)round(MotionBlur::g_maxHistoryFrames);
             } else if (MotionBlur::g_blurType == "Real Motion Blur") {
                 maxFrames = 8;
             } else {
-                maxFrames = (int)round(MotionBlur::g_blurIntensity);  // Usar g_blurIntensity para otros modos
+                maxFrames = (int)round(MotionBlur::g_blurIntensity);
             }
             
             if (maxFrames <= 0) maxFrames = 4;
@@ -275,36 +276,10 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     // Insert key - open menu
     if ((GetAsyncKeyState(VK_INSERT) & 0x8000) && (GetTickCount64() - g_lastToggle) > 400) {
         g_showMenu = !g_showMenu;
-        GUI::g_showMenu = g_showMenu;  // Sincronizar con GUI
         g_lastToggle = GetTickCount64();
-        
-        if (g_showMenu) {
-            // 🎮 BLOQUEAR INPUT DEL JUEGO
-            Input::BlockGameInput();
-            
-            Hook::oClipCursor(NULL);
-            // Si estamos en un mundo, ocultar cursor SO (mostrar cursor ImGui)
-            if (IsInWorld()) {
-                while (ShowCursor(FALSE) >= 0);
-            } else {
-                // Si NO estamos en un mundo, ocultar cursor ImGui pero mantener SO visible
-                // OS cursor visible by default
-            }
-        } else {
-            // 🎮 DESBLOQUEAR INPUT DEL JUEGO
-            Input::UnblockGameInput();
-            
-            // Menu closed - ensure cursor visible
-            while (ShowCursor(TRUE) < 0);
-        }
     }
-
-    // Motion blur cleanup
-    static bool wasMotionBlurEnabled = false;
-    if (!MotionBlur::g_motionBlurEnabled && wasMotionBlurEnabled) {
-        MotionBlur::CleanupBackbufferStorage();
-    }
-    wasMotionBlurEnabled = MotionBlur::g_motionBlurEnabled;
+    // Sync GUI state
+    GUI::g_showMenu = g_showMenu;
 
     // 📊 ANIMATION UPDATE - Simple y elegante
     ULONGLONG now = GetTickCount64();
@@ -313,7 +288,6 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     
     // 📉 MENU ANIMATION - Delegado a GUI
     GUI::UpdateAnimation(now, dt);
-    float easedMenuAnim = Animations::SmoothInertia(GUI::g_menuAnim);
     // 📊 Render Info + module animations
     Module::UpdateAnimation(now);
 
@@ -328,95 +302,13 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
     CPSCounter::UpdateAnimation(now);
 
     ImGui_ImplDX11_NewFrame();
-    // Don't use ImGui_ImplWin32_NewFrame - manual input handling
+    ImGui_ImplWin32_NewFrame();
     
     // Update input system (keyboard and mouse) - delegated to Input class
     bool drawImGuiCursor = (g_showMenu && IsInWorld());
     Input::Update(g_window, sw, sh, g_showMenu, drawImGuiCursor);
 
     ImGui::NewFrame();
-
-    // Motion blur - apply to background at frame start
-    if (MotionBlur::g_motionBlurEnabled && !g_showMenu && MotionBlur::g_previousFrames.size() > 0 && MotionBlur::g_motionBlurAnim > 0.01f) {
-        float currentTime = (float)GetTickCount64() / 1000.0f;
-        ImVec2 screenSize = ImGui::GetIO().DisplaySize;
-        ImDrawList* blurDraw = ImGui::GetBackgroundDrawList();
-        
-        // Average Pixel Blur: Promedio de frames con falloff
-        if (MotionBlur::g_blurType == "Average Pixel Blur") {
-            float alpha = 0.25f;
-            float bleedFactor = 0.95f;
-            for (const auto& frame : MotionBlur::g_previousFrames) {
-                if (frame) {
-                    ImU32 col = IM_COL32(255, 255, 255, (int)(alpha * MotionBlur::g_motionBlurAnim * 255.0f));
-                    blurDraw->AddImage((ImTextureID)frame, ImVec2(0, 0), screenSize, ImVec2(0, 0), ImVec2(1, 1), col);
-                    alpha *= bleedFactor;
-                }
-            }
-        } 
-        // Ghost frames: More visible
-        else if (MotionBlur::g_blurType == "Ghost Frames") {
-            float alpha = 0.30f;
-            float bleedFactor = 0.80f;
-            for (const auto& frame : MotionBlur::g_previousFrames) {
-                if (frame) {
-                    ImU32 col = IM_COL32(255, 255, 255, (int)(alpha * MotionBlur::g_motionBlurAnim * 255.0f));
-                    blurDraw->AddImage((ImTextureID)frame, ImVec2(0, 0), screenSize, ImVec2(0, 0), ImVec2(1, 1), col);
-                    alpha *= bleedFactor;
-                }
-            }
-        }
-        // Time Aware Blur: Decay exponencial
-        else if (MotionBlur::g_blurType == "Time Aware Blur") {
-            float T = MotionBlur::g_blurTimeConstant;
-            std::vector<float> weights;
-            float totalWeight = 0.0f;
-            
-            for (size_t i = 0; i < MotionBlur::g_previousFrames.size(); i++) {
-                float age = currentTime - MotionBlur::g_frameTimestamps[i];
-                float weight = expf(-age / T);
-                weights.push_back(weight);
-                totalWeight += weight;
-            }
-            
-            if (totalWeight > 0.0f) {
-                for (float& w : weights) {
-                    w /= totalWeight;
-                }
-            }
-            
-            for (size_t i = 0; i < MotionBlur::g_previousFrames.size(); i++) {
-                if (MotionBlur::g_previousFrames[i] && weights[i] > 0.001f) {
-                    ImU32 col = IM_COL32(255, 255, 255, (int)(weights[i] * MotionBlur::g_motionBlurAnim * 255.0f));
-                    blurDraw->AddImage((ImTextureID)MotionBlur::g_previousFrames[i], ImVec2(0, 0), screenSize, ImVec2(0, 0), ImVec2(1, 1), col);
-                }
-            }
-        }
-        // Real Motion Blur: Trails suaves
-        else if (MotionBlur::g_blurType == "Real Motion Blur") {
-            float alpha = 0.35f;
-            float bleedFactor = 0.85f;
-            for (const auto& frame : MotionBlur::g_previousFrames) {
-                if (frame) {
-                    ImU32 col = IM_COL32(255, 255, 255, (int)(alpha * MotionBlur::g_motionBlurAnim * 255.0f));
-                    blurDraw->AddImage((ImTextureID)frame, ImVec2(0, 0), screenSize, ImVec2(0, 0), ImVec2(1, 1), col);
-                    alpha *= bleedFactor;
-                }
-            }
-        }
-        // V4 (Onix-style)
-        else if (MotionBlur::g_blurType == "V4") {
-            float alpha = 0.35f;
-            float bleedFactor = 0.85f;
-            for (const auto& frame : MotionBlur::g_previousFrames) {
-                if (frame) {
-                    ImU32 col = IM_COL32(255, 255, 255, (int)(alpha * MotionBlur::g_motionBlurAnim * 255.0f));
-                    blurDraw->AddImage((ImTextureID)frame, ImVec2(0, 0), screenSize, ImVec2(0, 0), ImVec2(1, 1), col);
-                    alpha *= bleedFactor;
-                }
-            }
-        }
-    }
 
     // ArrayList - always visible top right
     // Handle drag for ArrayList
@@ -473,6 +365,11 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
 
 // Startup thread function
 DWORD WINAPI MainThread(LPVOID lpReserved) {
+    // Audio disabled to prevent crashes - enable only if needed
+    // if (ma_engine_init(NULL, &g_audioEngine) != MA_SUCCESS) {
+    //     // Failed to init audio, continue without it
+    // }
+    
     UnlockFPS::Initialize();
     UnlockFPS::SetFPS(60.0f);
     Hook::Initialize();
