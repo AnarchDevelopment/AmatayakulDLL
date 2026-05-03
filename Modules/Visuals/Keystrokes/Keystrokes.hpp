@@ -108,8 +108,8 @@ public:
     /// @brief Render keystrokes display
     static void RenderDisplay(float sw, float sh);
 
-    /// @brief Process keystrokes format string
-    static std::string ProcessKeystrokesFormat(const std::string& format, int value);
+    /// @brief Process keystrokes format string (supports {lmb}, {rmb}, {value} placeholders)
+    static std::string ProcessKeystrokesFormat(const std::string& format, int lmbCps, int rmbCps);
 
     /// @brief Render menu controls for keystrokes settings
     static void RenderMenu();

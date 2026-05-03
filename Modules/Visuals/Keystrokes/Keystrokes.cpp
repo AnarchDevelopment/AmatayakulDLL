@@ -446,8 +446,8 @@ void Keystrokes::RenderDisplay(float sw, float sh) {
                     }
                     keystrokesDraw->AddText(keystrokesFont, mouseTextScale, ImVec2(lmbTextPosX, lmbTextPosY), ImGui::GetColorU32(g_keystrokesTextStates[4]), g_keystrokesLMBText.c_str());
                     
-                    // LMB CPS text
-                    std::string lmbCpsStr = std::to_string(g_lmbCps) + " CPS";
+                    // LMB CPS text (supports {lmb}, {rmb}, {value} placeholders)
+                    std::string lmbCpsStr = ProcessKeystrokesFormat(g_keystrokesLMBFormatText, g_lmbCps, g_rmbCps);
                     float cpsMiniScale = 11.0f * g_keystrokesUIScale * g_keystrokesTextScale2;
                     if (g_keystrokesTextShadow) {
                         keystrokesDraw->AddText(keystrokesFont, cpsMiniScale, ImVec2(lmbTextPosX + textShadowOffset, lmbTextPosY + 19.0f * g_keystrokesUIScale + textShadowOffset), ImGui::GetColorU32(g_keystrokesShadowStates[4]), lmbCpsStr.c_str());
@@ -482,8 +482,8 @@ void Keystrokes::RenderDisplay(float sw, float sh) {
                         }
                         keystrokesDraw->AddText(keystrokesFont, mouseTextScale, ImVec2(rmbTextPosX, rmbTextPosY), ImGui::GetColorU32(g_keystrokesTextStates[5]), g_keystrokesRMBText.c_str());
                         
-                        // RMB CPS text
-                        std::string rmbCpsStr = std::to_string(g_rmbCps) + " CPS";
+                        // RMB CPS text (supports {lmb}, {rmb}, {value} placeholders)
+                        std::string rmbCpsStr = ProcessKeystrokesFormat(g_keystrokesRMBFormatText, g_lmbCps, g_rmbCps);
                         if (g_keystrokesTextShadow) {
                             keystrokesDraw->AddText(keystrokesFont, cpsMiniScale, ImVec2(rmbTextPosX + textShadowOffset, rmbTextPosY + 19.0f * g_keystrokesUIScale + textShadowOffset), ImGui::GetColorU32(g_keystrokesShadowStates[5]), rmbCpsStr.c_str());
                         }
@@ -644,18 +644,60 @@ void Keystrokes::RenderMenu() {
         GUI::ToggleButton("Show LMB & RMB##KS", &g_keystrokesShowLMBRMB);
         GUI::ToggleButton("Show Spacebar##KS", &g_keystrokesShowSpacebar);
         ImGui::SliderFloat("Spacebar Width##KS", &g_keystrokesSpacebarWidth, 0.1f, 2.0f, "%.2f");
+        
+        // LMB/RMB CPS Format strings
+        static char lmbFormatBuf[256] = {0};
+        static char rmbFormatBuf[256] = {0};
+        static bool firstRender = true;
+        
+        if (firstRender) {
+            strncpy_s(lmbFormatBuf, sizeof(lmbFormatBuf), g_keystrokesLMBFormatText.c_str(), _TRUNCATE);
+            strncpy_s(rmbFormatBuf, sizeof(rmbFormatBuf), g_keystrokesRMBFormatText.c_str(), _TRUNCATE);
+            firstRender = false;
+        }
+        
+        if (ImGui::InputText("LMB Format##KS", lmbFormatBuf, sizeof(lmbFormatBuf))) {
+            g_keystrokesLMBFormatText = std::string(lmbFormatBuf);
+        }
+        ImGui::TextWrapped("Use {lmb} for LMB CPS, {rmb} for RMB CPS");
+        
+        if (ImGui::InputText("RMB Format##KS", rmbFormatBuf, sizeof(rmbFormatBuf))) {
+            g_keystrokesRMBFormatText = std::string(rmbFormatBuf);
+        }
+        ImGui::TextWrapped("Use {lmb} for LMB CPS, {rmb} for RMB CPS");
     }
 }
 
-std::string Keystrokes::ProcessKeystrokesFormat(const std::string& format, int value) {
+std::string Keystrokes::ProcessKeystrokesFormat(const std::string& format, int lmbCps, int rmbCps) {
     std::string result = format;
     std::string formatUpper = format;
     for (char& c : formatUpper) c = std::toupper(c);
     
-    size_t pos = formatUpper.find("{VALUE}");
+    // Replace {LMB} with left click CPS
+    size_t pos = formatUpper.find("{LMB}");
     if (pos != std::string::npos) {
         char buffer[32];
-        snprintf(buffer, sizeof(buffer), "%d", value);
+        snprintf(buffer, sizeof(buffer), "%d", lmbCps);
+        result.replace(pos, 5, buffer);
+    }
+    
+    // Replace {RMB} with right click CPS
+    formatUpper = result;
+    for (char& c : formatUpper) c = std::toupper(c);
+    pos = formatUpper.find("{RMB}");
+    if (pos != std::string::npos) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%d", rmbCps);
+        result.replace(pos, 5, buffer);
+    }
+    
+    // Replace {VALUE} with LMB CPS (for backward compatibility)
+    formatUpper = result;
+    for (char& c : formatUpper) c = std::toupper(c);
+    pos = formatUpper.find("{VALUE}");
+    if (pos != std::string::npos) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%d", lmbCps);
         result.replace(pos, 7, buffer);
     }
     
