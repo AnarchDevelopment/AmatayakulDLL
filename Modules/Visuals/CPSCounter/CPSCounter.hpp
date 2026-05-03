@@ -10,6 +10,8 @@ struct ImVec2;
 struct ImVec4;
 class HudElement;
 
+constexpr int MAX_CPS_HISTORY = 100;
+
 class CPSCounter {
 public:
     // Configuration
@@ -33,13 +35,14 @@ public:
     static bool g_cpsCounterFirstRender;
     
     // CPS Click tracking
-    static const int MAX_CPS_HISTORY = 100;
-    static ULONGLONG g_lmbClickTimes[100];
-    static ULONGLONG g_rmbClickTimes[100];
+    static ULONGLONG g_lmbClickTimes[MAX_CPS_HISTORY];
+    static ULONGLONG g_rmbClickTimes[MAX_CPS_HISTORY];
     static int g_lmbClickIndex;
     static int g_rmbClickIndex;
     static int g_lmbCps;
     static int g_rmbCps;
+    static ULONGLONG g_lastLmbClickTime;
+    static ULONGLONG g_lastRmbClickTime;
     
     // HUD Element
     static HudElement* g_cpsHud;

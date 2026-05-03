@@ -13,6 +13,9 @@ class HudElement;
 /// @brief Keystrokes module - Displays pressed keys (WASD, Mouse, Spacebar) with visual feedback
 class Keystrokes {
 public:
+    // CPS History
+    static const int MAX_CPS_HISTORY = 100;
+    
     // Static member variables for state
     static bool g_showKeystrokes;
     static float g_keystrokesAnim;
@@ -90,6 +93,8 @@ public:
     static int g_rmbCps;
     static bool g_prevLmbPressed;
     static bool g_prevRmbPressed;
+    static ULONGLONG g_lastLmbClickTime;
+    static ULONGLONG g_lastRmbClickTime;
 
     /// @brief Initialize Keystrokes with HudElement reference
     static void Initialize(HudElement* hud);

@@ -2,6 +2,7 @@
 #include "../../../Animations/Animations.hpp"
 #include "../../../Utils/HudElement.hpp"
 #include "../../../ImGui/imgui.h"
+#include "../../../GUI/GUI.hpp"
 #include <windows.h>
 #include <cmath>
 #include <algorithm>
@@ -9,7 +10,7 @@
 // Forward declarations for helper functions
 extern bool g_showMenu;
 bool CPSCounter::g_showCpsCounter = true;
-std::string CPSCounter::g_cpsCounterFormat = "CPS: {lmb} | {rmb}";
+std::string CPSCounter::g_cpsCounterFormat = "{CPS} CPS";
 float CPSCounter::g_cpsTextScale = 1.0f;
 ImVec4 CPSCounter::g_cpsTextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -34,6 +35,8 @@ int CPSCounter::g_lmbClickIndex = 0;
 int CPSCounter::g_rmbClickIndex = 0;
 int CPSCounter::g_lmbCps = 0;
 int CPSCounter::g_rmbCps = 0;
+ULONGLONG CPSCounter::g_lastLmbClickTime = 0;
+ULONGLONG CPSCounter::g_lastRmbClickTime = 0;
 
 // Forward declarations for easing and HudElement (these will be linked from dllmain.cpp)
 extern bool g_showMenu;
@@ -43,37 +46,41 @@ void CPSCounter::Initialize(HudElement* hudElement) {
 }
 
 void CPSCounter::UpdateCPS(ULONGLONG now, bool lmbPressed, bool rmbPressed, bool prevLmbPressed, bool prevRmbPressed) {
-    // LMB CPS Counter
+    // LMB CPS Counter - only save timestamp on click, with debounce
     if (lmbPressed && !prevLmbPressed) {
-        // Save click timestamp
-        g_lmbClickTimes[g_lmbClickIndex] = now;
-        g_lmbClickIndex = (g_lmbClickIndex + 1) % MAX_CPS_HISTORY;
-        
-        // Count clicks in last 1000ms
-        int count = 0;
-        for (int i = 0; i < MAX_CPS_HISTORY; i++) {
-            if (g_lmbClickTimes[i] > 0 && (now - g_lmbClickTimes[i]) < 1000) {
-                count++;
-            }
+        if (now - g_lastLmbClickTime > 50) {
+            g_lmbClickTimes[g_lmbClickIndex] = now;
+            g_lmbClickIndex = (g_lmbClickIndex + 1) % MAX_CPS_HISTORY;
+            g_lastLmbClickTime = now;
         }
-        g_lmbCps = count;
     }
     
-    // RMB CPS Counter
-    if (rmbPressed && !prevRmbPressed) {
-        // Save click timestamp
-        g_rmbClickTimes[g_rmbClickIndex] = now;
-        g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;
-        
-        // Count clicks in last 1000ms
-        int count = 0;
-        for (int i = 0; i < MAX_CPS_HISTORY; i++) {
-            if (g_rmbClickTimes[i] > 0 && (now - g_rmbClickTimes[i]) < 1000) {
-                count++;
-            }
+    // Always calculate LMB CPS from timestamp array
+    int count = 0;
+    for (int i = 0; i < MAX_CPS_HISTORY; i++) {
+        if (g_lmbClickTimes[i] > 0 && (now - g_lmbClickTimes[i]) < 1000) {
+            count++;
         }
-        g_rmbCps = count;
     }
+    g_lmbCps = count;
+    
+    // RMB CPS Counter - only save timestamp on click, with debounce
+    if (rmbPressed && !prevRmbPressed) {
+        if (now - g_lastRmbClickTime > 50) {
+            g_rmbClickTimes[g_rmbClickIndex] = now;
+            g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;
+            g_lastRmbClickTime = now;
+        }
+    }
+    
+    // Always calculate RMB CPS from timestamp array
+    count = 0;
+    for (int i = 0; i < MAX_CPS_HISTORY; i++) {
+        if (g_rmbClickTimes[i] > 0 && (now - g_rmbClickTimes[i]) < 1000) {
+            count++;
+        }
+    }
+    g_rmbCps = count;
 }
 
 void CPSCounter::UpdateAnimation(ULONGLONG now) {
@@ -205,10 +212,10 @@ void CPSCounter::RenderDisplay(int screenWidth, int screenHeight) {
 }
 
 void CPSCounter::RenderMenu() {
-    static char cpsFormatBuf[256] = "CPS: {lmb} | {rmb}";
+    static char cpsFormatBuf[256] = "{CPS} CPS";
     
     // Show CPS Counter toggle
-    ImGui::Checkbox("CPS Counter", &g_showCpsCounter);
+    GUI::ToggleButton("CPS Counter", &g_showCpsCounter);
     
     if (g_showCpsCounter) {
         ImGui::Separator();
@@ -217,7 +224,7 @@ void CPSCounter::RenderMenu() {
         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha * 0.8f);
         
         // Color picker
-        ImGui::ColorEdit4("CPS Text Color##CPSCounter", &g_cpsTextColor.x);
+        ImGui::ColorEdit4("CPS Text Color##CPSCounter", (float*)&g_cpsTextColor);
         
         // Format string
         if (!g_cpsCounterFirstRender) {
@@ -227,24 +234,20 @@ void CPSCounter::RenderMenu() {
         if (ImGui::InputText("Format String##CPS", cpsFormatBuf, sizeof(cpsFormatBuf))) {
             g_cpsCounterFormat = std::string(cpsFormatBuf);
         }
-        ImGui::TextWrapped("Use {LMB} and {RMB} for left and right mouse button CPS");
+        ImGui::TextWrapped("Use {CPS} for CPS counter");
         
         // Text Scale
         ImGui::SliderFloat("CPS Text Scale##CPSCounter", &g_cpsTextScale, 0.5f, 2.0f, "%.2f");
-        
-        // Position
-        ImGui::SliderFloat("CPS X Position##CPSCounter", &g_cpsCounterX, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("CPS Y Position##CPSCounter", &g_cpsCounterY, 0.0f, 1.0f, "%.2f");
         
         // Alignment
         const char* alignmentItems[] = { "Left", "Center", "Right" };
         ImGui::Combo("CPS Text Alignment##CPSCounter", &g_cpsCounterAlignment, alignmentItems, IM_ARRAYSIZE(alignmentItems));
         
         // Shadow
-        ImGui::Checkbox("CPS Text Shadow##CPSCounter", &g_cpsCounterShadow);
+        GUI::ToggleButton("CPS Text Shadow##CPSCounter", &g_cpsCounterShadow);
         if (g_cpsCounterShadow) {
             ImGui::SliderFloat("CPS Shadow Offset##CPSCounter", &g_cpsCounterShadowOffset, 0.0f, 10.0f, "%.1f");
-            ImGui::ColorEdit4("CPS Shadow Color##CPSCounter", &g_cpsCounterShadowColor.x);
+            ImGui::ColorEdit4("CPS Shadow Color##CPSCounter", (float*)&g_cpsCounterShadowColor);
         }
         
         ImGui::PopStyleVar();  // Alpha
@@ -254,12 +257,22 @@ void CPSCounter::RenderMenu() {
 std::string CPSCounter::ProcessCPSCounterFormat(const std::string& format, int lmb, int rmb) {
     std::string result = format;
     
-    // Replace placeholders
+    // Replace placeholders (case-insensitive)
     std::string formatUpper = format;
     for (char& c : formatUpper) c = std::toupper(c);
     
+    // Replace CPS placeholder (uses LMB CPS)
+    size_t pos = formatUpper.find("{CPS}");
+    if (pos != std::string::npos) {
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%d", lmb);
+        result.replace(pos, 5, buffer);
+    }
+    
     // Replace LMB placeholder
-    size_t pos = formatUpper.find("{LMB}");
+    formatUpper = result;
+    for (char& c : formatUpper) c = std::toupper(c);
+    pos = formatUpper.find("{LMB}");
     if (pos != std::string::npos) {
         char buffer[32];
         snprintf(buffer, sizeof(buffer), "%d", lmb);
