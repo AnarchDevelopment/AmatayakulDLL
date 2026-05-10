@@ -2,7 +2,7 @@
 
 A minecraft utility client for Minecraft Windows 10 Edition Beta 0.15.10
 
-**discord**: zhenrikepvp_ (Henrike)
+**Discord**: zhenrikepvp_ (Henrike)
 
 ## Preview
 
