@@ -2,6 +2,8 @@
 
 Un client para Minecraft Windows 10 Edition Beta (0.15.10)
 
+Por favor reportar bugs al discord abajo:
+
 **Discord**: zhenrikepvp_ (Henrike)
 
 ## Previa
