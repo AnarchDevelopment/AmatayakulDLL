@@ -11,6 +11,7 @@ bool FPSCounter::g_showFpsCounter = true;
 float FPSCounter::g_fpsTextScale = 1.0f;
 ImVec4 FPSCounter::g_fpsTextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 float FPSCounter::g_fpsCounterAnim = 1.0f;
+
 ULONGLONG FPSCounter::g_fpsCounterEnableTime = 0;
 ULONGLONG FPSCounter::g_fpsCounterDisableTime = 0;
 int FPSCounter::g_fpsCounterAlignment = 0;
@@ -152,7 +153,7 @@ void FPSCounter::RenderDisplay(float screenWidth, float screenHeight) {
                 // Shadow if enabled
                 if (g_fpsCounterShadow) {
                     ImVec4 shadowCol = g_fpsCounterShadowColor;
-                    shadowCol.w = easedAnim;
+                    shadowCol.w *= easedAnim;
                     fpsDraw->AddText(fpsFont, fontSize,
                         ImVec2(finalPos.x + g_fpsCounterShadowOffset, finalPos.y + g_fpsCounterShadowOffset),
                         ImGui::GetColorU32(shadowCol),
@@ -162,7 +163,7 @@ void FPSCounter::RenderDisplay(float screenWidth, float screenHeight) {
 
                 // Main text
                 ImVec4 textCol = g_fpsTextColor;
-                textCol.w = easedAnim;
+                textCol.w *= easedAnim;
                 fpsDraw->AddText(fpsFont, fontSize, finalPos, ImGui::GetColorU32(textCol), fpsText);
             }
         }
@@ -181,6 +182,8 @@ void FPSCounter::RenderMenu() {
 
         // Color picker
             ImGui::ColorEdit4("FPS Text Color##FPSCounter", (float*)&g_fpsTextColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::SliderFloat("Text Opacity", &g_fpsTextColor.w, 0.0f, 1.0f, "%.2f");
+            
 
         // Text Scale
         ImGui::SliderFloat("FPS Text Scale##FPSCounter", &g_fpsTextScale, 0.5f, 2.0f, "%.2f");
@@ -194,6 +197,7 @@ void FPSCounter::RenderMenu() {
         if (g_fpsCounterShadow) {
             ImGui::SliderFloat("FPS Shadow Offset##FPSCounter", &g_fpsCounterShadowOffset, 0.0f, 10.0f, "%.1f");
             ImGui::ColorEdit4("FPS Shadow Color##FPSCounter", (float*)&g_fpsCounterShadowColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::SliderFloat("Shadow Opacity", &g_fpsCounterShadowColor.w, 0.0f, 1.0f, "%.2f");
         }
 
         ImGui::PopStyleVar();

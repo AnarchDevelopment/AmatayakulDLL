@@ -4,10 +4,10 @@
 #include <windows.h>
 #include <cstdint>
 
-/// @brief Info module - Displays information about the menu, repository, and logo
+/// @brief Info module - Displays information about Amatayakul Client
 class Info {
 public:
-    /// @brief Initialize the Info module and load the logo texture
+    /// @brief Initialize the Info module
     static void Initialize();
     
     /// @brief Render the Info menu tab
@@ -17,26 +17,16 @@ public:
     static void Shutdown();
 
 private:
-    static ImTextureID g_logoTexture;
-    static int g_logoWidth;
-    static int g_logoHeight;
-    
-    // Audio resources
+    // Audio resources (disabled)
     static uint8_t* g_audioData;
     static uint32_t g_audioDataSize;
     
-    /// @brief Load logo image from RC resource
-    static bool LoadLogoFromResource();
-    
-    /// @brief Load image data into ImGui texture
-    static ImTextureID LoadTextureFromMemory(const unsigned char* data, int size);
-    
-    /// @brief Load audio from RC resource
+    /// @brief Load audio from RC resource (disabled)
     static bool LoadAudioFromResource();
     
-    /// @brief Initialize sound from loaded audio data (memory only, no files)
+    /// @brief Initialize sound from loaded audio data (disabled)
     static void InitSoundFromMemory();
     
-    /// @brief Play click sound
+    /// @brief Play click sound (disabled)
     static void PlayClickSound();
 };

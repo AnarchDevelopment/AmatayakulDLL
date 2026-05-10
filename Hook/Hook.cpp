@@ -43,20 +43,29 @@ void* GetVTableAddress(int index) {
 }
 
 void Hook::Initialize() {
-    Sleep(2000);
-    MH_Initialize();
+    // Reduced sleep for faster injection
+    Sleep(500);
+    
+    if (MH_Initialize() != MH_OK) {
+        return;
+    }
     
     // Get VTable addresses
     void* pPres = GetVTableAddress(8);
     void* pRes = GetVTableAddress(13);
+    
+    if (!pPres || !pRes) {
+        return;
+    }
+    
     void* pSetCP = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), "SetCursorPos");
     void* pClipC = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), "ClipCursor");
     
     // Create hooks
-    MH_CreateHook(pPres, (LPVOID)Hook::hkPresent, (LPVOID*)&Hook::oPresent);
-    MH_CreateHook(pRes, (LPVOID)Hook::hkResizeBuffers, (LPVOID*)&Hook::oResizeBuffers);
-    MH_CreateHook(pSetCP, (LPVOID)Hook::hkSetCursorPos, (LPVOID*)&Hook::oSetCursorPos);
-    MH_CreateHook(pClipC, (LPVOID)Hook::hkClipCursor, (LPVOID*)&Hook::oClipCursor);
+    if (pPres) MH_CreateHook(pPres, (LPVOID)Hook::hkPresent, (LPVOID*)&Hook::oPresent);
+    if (pRes) MH_CreateHook(pRes, (LPVOID)Hook::hkResizeBuffers, (LPVOID*)&Hook::oResizeBuffers);
+    if (pSetCP) MH_CreateHook(pSetCP, (LPVOID)Hook::hkSetCursorPos, (LPVOID*)&Hook::oSetCursorPos);
+    if (pClipC) MH_CreateHook(pClipC, (LPVOID)Hook::hkClipCursor, (LPVOID*)&Hook::oClipCursor);
     
     // Enable all hooks
     MH_EnableHook(MH_ALL_HOOKS);

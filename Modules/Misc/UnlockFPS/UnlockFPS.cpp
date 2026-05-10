@@ -1,6 +1,7 @@
 #include "UnlockFPS.hpp"
 #include "Animations/Animations.hpp"
 #include "ImGui/imgui.h"
+#include "../../../GUI/GUI.hpp"
 #include <Windows.h>
 #include <cstdio>
 #include <cmath>
@@ -82,6 +83,8 @@ void UnlockFPS::UpdateFPS() {
     lastPresentTime = now;
 }
 
+
+
 void UnlockFPS::SetFPS(float fps)
 {
     if (fps < 5.0f) fps = 5.0f;
@@ -137,7 +140,10 @@ void UnlockFPS::RenderArrayList(ImDrawList* draw, ImVec2 arrayListStart, float& 
 }
 
 void UnlockFPS::RenderMenu() {
-    if (ImGui::Checkbox("Unlock FPS", &g_unlockFpsEnabled)) {
+    GUI::ToggleButton("Unlock FPS", &g_unlockFpsEnabled);
+    static bool prevState = false;
+    if (g_unlockFpsEnabled != prevState) {
+        prevState = g_unlockFpsEnabled;
         if (g_unlockFpsEnabled) {
             g_unlockFpsEnableTime = GetTickCount64();
             g_unlockFpsDisableTime = 0;

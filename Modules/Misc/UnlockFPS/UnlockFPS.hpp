@@ -6,7 +6,7 @@
 class ImDrawList;
 struct ImVec2;
 
-/// @brief UnlockFPS module - Unlocks frame rate and provides FPS limiting
+/// @brief UnlockFPS module - Unlocks frame rate and provides FPS limiting for UWP apps
 class UnlockFPS {
 public:
     // Static member variables for state
@@ -22,4 +22,7 @@ public:
     static void RenderMenu();
     static void SetFPS(float fps);
     static float GetFPS();
+    
+    // UWP-specific: Force VSync off by patching DXGI swap chain
+    static void DisableVSyncUWP();
 };

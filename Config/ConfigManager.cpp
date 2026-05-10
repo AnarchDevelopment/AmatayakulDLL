@@ -201,23 +201,8 @@ bool ConfigManager::OpenConfigDirectory() {
 
 nlohmann::json ConfigManager::CollectCurrentConfig() {
     nlohmann::json config;
-
-    // Combat modules
-    config["Combat"]["Hitbox"]["enabled"] = Hitbox::g_hitboxEnabled;
-    config["Combat"]["Hitbox"]["value"] = Hitbox::g_hitboxValue;
-
-    config["Combat"]["Reach"]["enabled"] = Reach::IsEnabled();
-    config["Combat"]["Reach"]["value"] = Reach::g_reachValue;
-
-    // Movement modules
-    config["Movement"]["AutoSprint"]["enabled"] = AutoSprint::g_autoSprintEnabled;
-    config["Movement"]["Timer"]["enabled"] = Timer::g_timerEnabled;
-    config["Movement"]["Timer"]["value"] = Timer::g_timerValue;
-
+    
     // Visuals modules
-    config["Visuals"]["FullBright"]["enabled"] = FullBright::g_fullBrightEnabled;
-    config["Visuals"]["FullBright"]["value"] = FullBright::g_fullBrightValue;
-
     config["Visuals"]["RenderInfo"]["enabled"] = RenderInfo::g_showRenderInfo;
     if (RenderInfo::g_renderInfoHud) {
         config["Visuals"]["RenderInfo"]["position"]["x"] = RenderInfo::g_renderInfoHud->pos.x;
@@ -275,57 +260,8 @@ nlohmann::json ConfigManager::CollectCurrentConfig() {
 }
 
 void ConfigManager::ApplyConfig(const nlohmann::json& config) {
-    // Combat modules
-    if (config.contains("Combat")) {
-        if (config["Combat"].contains("Hitbox")) {
-            if (config["Combat"]["Hitbox"].contains("enabled")) {
-                Hitbox::g_hitboxEnabled = config["Combat"]["Hitbox"]["enabled"];
-            }
-            if (config["Combat"]["Hitbox"].contains("value")) {
-                Hitbox::g_hitboxValue = config["Combat"]["Hitbox"]["value"];
-            }
-        }
-        if (config["Combat"].contains("Reach")) {
-            if (config["Combat"]["Reach"].contains("enabled")) {
-                Reach::SetEnabled(config["Combat"]["Reach"]["enabled"]);
-            }
-            if (config["Combat"]["Reach"].contains("value")) {
-                if (Reach::IsEnabled()) {
-                    Reach::UpdateValue(config["Combat"]["Reach"]["value"]);
-                } else {
-                    Reach::g_reachValue = 3.0f;
-                }
-            }
-        }
-    }
-
-    // Movement modules
-    if (config.contains("Movement")) {
-        if (config["Movement"].contains("AutoSprint")) {
-            if (config["Movement"]["AutoSprint"].contains("enabled")) {
-                AutoSprint::g_autoSprintEnabled = config["Movement"]["AutoSprint"]["enabled"];
-            }
-        }
-        if (config["Movement"].contains("Timer")) {
-            if (config["Movement"]["Timer"].contains("enabled")) {
-                Timer::g_timerEnabled = config["Movement"]["Timer"]["enabled"];
-            }
-            if (config["Movement"]["Timer"].contains("value")) {
-                Timer::g_timerValue = config["Movement"]["Timer"]["value"];
-            }
-        }
-    }
-
     // Visuals modules
     if (config.contains("Visuals")) {
-        if (config["Visuals"].contains("FullBright")) {
-            if (config["Visuals"]["FullBright"].contains("enabled")) {
-                FullBright::g_fullBrightEnabled = config["Visuals"]["FullBright"]["enabled"];
-            }
-            if (config["Visuals"]["FullBright"].contains("value")) {
-                FullBright::g_fullBrightValue = config["Visuals"]["FullBright"]["value"];
-            }
-        }
         if (config["Visuals"].contains("RenderInfo")) {
             if (config["Visuals"]["RenderInfo"].contains("enabled")) {
                 RenderInfo::g_showRenderInfo = config["Visuals"]["RenderInfo"]["enabled"];
@@ -418,35 +354,5 @@ void ConfigManager::ApplyConfig(const nlohmann::json& config) {
 
 void ConfigManager::ReloadModulesAfterConfig() {
     // Re-enable or disable modules based on their saved state
-    if (Hitbox::g_hitboxEnabled) {
-        Hitbox::Enable();
-    } else {
-        Hitbox::Disable();
-    }
-    
-    if (AutoSprint::g_autoSprintEnabled) {
-        AutoSprint::Enable();
-    } else {
-        AutoSprint::Disable();
-    }
-
-    if (FullBright::g_fullBrightEnabled) {
-        FullBright::Enable();
-    } else {
-        FullBright::Disable();
-    }
-
-    if (Reach::IsEnabled()) {
-        Reach::SetEnabled(true);
-    } else {
-        Reach::SetEnabled(false);
-    }
-
-    if (Timer::g_timerEnabled) {
-        Timer::Enable();
-    } else {
-        Timer::Disable();
-    }
-
     Terminal::AddOutput("Modules reloaded after config load.");
 }

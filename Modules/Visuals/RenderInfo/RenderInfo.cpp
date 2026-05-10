@@ -119,9 +119,9 @@ void RenderInfo::RenderWindow() {
             ImGui::Text("Build: Release");
             ImGui::Text("Compiler: GCC");
             ImGui::PopStyleColor();
-            
-            ImGui::End();
         }
+        ImGui::End();
+
         
         // DEBUG: show hitbox only when menu is open
         if (g_showMenu) {

@@ -189,11 +189,12 @@ int Input::KeyboardBlockHookProc(int nCode, WPARAM wParam, LPARAM lParam, bool m
 void Input::BlockGameInput() {
     // Install hook if needed
     if (!g_keyboardHook) {
-        HMODULE hMod = GetModuleHandleA("aegledll");
+        HMODULE hMod = GetModuleHandleA("amatayakul.dll");
         if (!hMod) hMod = GetModuleHandleA(nullptr);
         extern LRESULT CALLBACK KeyboardBlockHookProc(int, WPARAM, LPARAM);
         g_keyboardHook = SetWindowsHookExA(WH_KEYBOARD_LL, KeyboardBlockHookProc, hMod, 0);
     }
+
 }
 
 void Input::UnblockGameInput() {

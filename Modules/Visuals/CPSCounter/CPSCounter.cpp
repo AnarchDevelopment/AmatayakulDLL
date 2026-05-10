@@ -14,6 +14,7 @@ std::string CPSCounter::g_cpsCounterFormat = "{CPS} CPS";
 float CPSCounter::g_cpsTextScale = 1.0f;
 ImVec4 CPSCounter::g_cpsTextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 
+
 float CPSCounter::g_cpsCounterAnim = 1.0f;
 ULONGLONG CPSCounter::g_cpsCounterEnableTime = 0;
 ULONGLONG CPSCounter::g_cpsCounterDisableTime = 0;
@@ -194,7 +195,7 @@ void CPSCounter::RenderDisplay(int screenWidth, int screenHeight) {
                 // Shadow if enabled
                 if (g_cpsCounterShadow) {
                     ImVec4 shadowCol = g_cpsCounterShadowColor;
-                    shadowCol.w = easedAnim;
+                    shadowCol.w *= easedAnim;
                     cpsDraw->AddText(cpsFont, fontSize, 
                         ImVec2(finalPos.x + g_cpsCounterShadowOffset, finalPos.y + g_cpsCounterShadowOffset),
                         ImGui::GetColorU32(shadowCol),
@@ -204,7 +205,7 @@ void CPSCounter::RenderDisplay(int screenWidth, int screenHeight) {
                 
                 // Main text
                 ImVec4 textCol = g_cpsTextColor;
-                textCol.w = easedAnim;
+                textCol.w *= easedAnim;
                 cpsDraw->AddText(cpsFont, fontSize, finalPos, ImGui::GetColorU32(textCol), cpsText.c_str());
             }
         }
@@ -225,6 +226,8 @@ void CPSCounter::RenderMenu() {
         
         // Color picker
         ImGui::ColorEdit4("CPS Text Color##CPSCounter", (float*)&g_cpsTextColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::SliderFloat("Text Opacity", &g_cpsTextColor.w, 0.0f, 1.0f, "%.2f");
+        
         
         // Format string
         if (!g_cpsCounterFirstRender) {
@@ -248,6 +251,7 @@ void CPSCounter::RenderMenu() {
         if (g_cpsCounterShadow) {
             ImGui::SliderFloat("CPS Shadow Offset##CPSCounter", &g_cpsCounterShadowOffset, 0.0f, 10.0f, "%.1f");
             ImGui::ColorEdit4("CPS Shadow Color##CPSCounter", (float*)&g_cpsCounterShadowColor, ImGuiColorEditFlags_NoInputs);
+        ImGui::SliderFloat("Shadow Opacity", &g_cpsCounterShadowColor.w, 0.0f, 1.0f, "%.2f");
         }
         
         ImGui::PopStyleVar();  // Alpha

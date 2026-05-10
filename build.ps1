@@ -15,7 +15,7 @@ function Write-Log([string]$Msg, [string]$Type = "Info") {
     Write-Host ("{0} {1}" -f $Icon, $Msg) -ForegroundColor $Color
 }
 
-$ProjectName = "AegleInternal"
+$ProjectName = "AmatayakulClient"
 $BuildDir    = "obj"
 
 # Set output directory based on build type
@@ -24,28 +24,30 @@ if ($BuildType -eq "--debug") {
 } else {
     $BinDir = "build/Release"
 }
-$Output      = Join-Path $BinDir "aegledll.dll"
+$Output      = Join-Path $BinDir "amatayakul.dll"
+
+# Path to MinGW-w64 compiler
+$MinGWPath = "build-tool\mingw64/bin"
+$gpp = Join-Path $MinGWPath "g++.exe"
+$windres = Join-Path $MinGWPath "windres.exe"
 
 $Sources =  "dllmain.cpp", 
             "ImGui/imgui.cpp", 
             "ImGui/imgui_draw.cpp", 
             "ImGui/imgui_widgets.cpp", 
-            "ImGui/imgui_tables.cpp", `
+            "ImGui/imgui_tables.cpp",
             "ImGui/backend/imgui_impl_dx11.cpp", 
             "ImGui/backend/imgui_impl_win32.cpp", 
             "Modules/Alloc/AllocateNear.cpp",
             "Modules/PatternScan/PatternScan.cpp",
             "Config/ConfigManager.cpp",
-            "Modules/Combat/Reach/Reach.cpp",
-            "Modules/Combat/Hitbox/Hitbox.cpp",
-            "Modules/Movement/AutoSprint/AutoSprint.cpp",
-            "Modules/Movement/Timer/Timer.cpp",
-            "Modules/Visuals/FullBright/FullBright.cpp",
             "Modules/Visuals/RenderInfo/RenderInfo.cpp",
+            "Modules/Visuals/ArrayList/ArrayList.cpp",
             "Modules/Visuals/Watermark/Watermark.cpp",
-            "Modules/Visuals/MotionBlur/MotionBlur.cpp",
             "Modules/Visuals/Keystrokes/Keystrokes.cpp",
             "Modules/Visuals/CPSCounter/CPSCounter.cpp",
+            "Modules/Visuals/FPSCounter/FPSCounter.cpp",
+            "Modules/Visuals/MotionBlur/MotionBlur.cpp",
             "Modules/Misc/UnlockFPS/UnlockFPS.cpp",
             "Modules/Terminal/Terminal.cpp",
             "Modules/Info/Info.cpp",
@@ -98,7 +100,7 @@ foreach ($File in $Sources) {
         $Status = "[{0}/{1}]" -f $Count, $Total
         Write-Log "$Status Compiling: $File" "Warn"
         
-        & g++ -c $File -o $ObjFile $Flags 2>&1 | Tee-Object -Variable Err | Out-Null
+        & $gpp -c $File -o $ObjFile $Flags 2>&1 | Tee-Object -Variable Err | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Log "Fatal error in $File." "Error"
             Write-Host ($Err | Out-String) -ForegroundColor Gray
@@ -114,7 +116,7 @@ if (!(Test-Path $BuildDir)) { New-Item -ItemType Directory -Path $BuildDir | Out
 if (!(Test-Path $ResourceObj) -or (Get-Item $ResourceFile).LastWriteTime -gt (Get-Item $ResourceObj).LastWriteTime) {
     Write-Log "Compiling resource file: $ResourceFile" "Warn"
     
-    & windres.exe $ResourceFile -O coff -o $ResourceObj 2>&1 | Tee-Object -Variable Err | Out-Null
+    & $windres $ResourceFile -O coff -o $ResourceObj 2>&1 | Tee-Object -Variable Err | Out-Null
     if ($LASTEXITCODE -ne 0) {
         Write-Log "Fatal error compiling resources." "Error"
         Write-Host ($Err | Out-String) -ForegroundColor Gray
@@ -125,7 +127,7 @@ if (!(Test-Path $ResourceObj) -or (Get-Item $ResourceFile).LastWriteTime -gt (Ge
 $ObjectFiles += $ResourceObj
 
 Write-Log "Linking binary in directory: $BinDir" "Link"
-& g++ -shared -o $Output $ObjectFiles $Flags $Libs
+& $gpp -shared -o $Output $ObjectFiles $Flags $Libs
 
 if ($LASTEXITCODE -eq 0) {
     $Size = [Math]::Round((Get-Item $Output).Length / 1KB, 2)
