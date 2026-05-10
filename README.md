@@ -1,7 +1,8 @@
-# Amatayakul Client
+## Amatayakul Client
 
-A simple overlay/tweaks DLL client for Minecraft Windows 10 Edition Beta
+A minecraft utility client for Minecraft Windows 10 Edition Beta 0.15.10
 
-Use: https://github.com/Aztral-Network/AmatayakulLauncher
+## Preview
 
-Credits: https://github.com/iVyz3r/aegledll
+<img width="860" height="591" alt="image" src="https://github.com/user-attachments/assets/cd1a9914-21ba-4096-96c1-2c932bfa9025" />
+
