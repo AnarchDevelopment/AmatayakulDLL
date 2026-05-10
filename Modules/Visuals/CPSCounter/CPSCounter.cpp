@@ -143,11 +143,11 @@ void CPSCounter::RenderDisplay(int screenWidth, int screenHeight) {
         ImFont* cpsFont = ImGui::GetFont();
         if (cpsFont) {
             float fontSize = 18.0f * g_cpsTextScale;
-            ImVec2 textSize = ImGui::CalcTextSize(cpsText.c_str());
+            ImVec2 textSize = cpsFont->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, cpsText.c_str());
             // Update collision size from text
             g_cpsHud->size = ImVec2(
-                textSize.x * g_cpsTextScale + 4.0f,  // Small padding
-                fontSize + 4.0f
+                textSize.x + 8.0f,  // Small padding
+                textSize.y + 4.0f
             );
         }
         

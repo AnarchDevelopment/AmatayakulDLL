@@ -235,7 +235,8 @@ void GUI::LoadIcons(void* pDevice) {
         {"unlockfps", IDR_ICON_UNLOCKFPS},
         {"watermark", IDR_ICON_WATERMARK},
         {"arraylist", IDR_ICON_ARRAYLIST},
-        {"back", IDR_ICON_BACK}
+        {"back", IDR_ICON_BACK},
+        {"logo", IDR_ICON_LOGO}
     };
     
     for (auto& ic : icons) {

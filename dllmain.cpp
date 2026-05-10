@@ -40,6 +40,7 @@ ID3D11RenderTargetView* mainRenderTargetView = NULL;
 HWND g_window = NULL;
 
 bool g_showMenu = false;
+bool g_prevShowMenu = false;
 bool g_RequestUnload = false;
 float g_lastW = 0, g_lastH = 0;
 ULONGLONG g_tabChangeTime = 0;
@@ -121,6 +122,9 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
                 g_gameBase = (uintptr_t)GetModuleHandleA(NULL);
                 Module::Initialize(g_gameBase, &g_renderInfoHud, &g_watermarkHud, &g_keystrokesHud, &g_cpsHud, &g_fpsHud);
                 
+                // Auto-load saved config
+                ConfigManager::AutoLoad();
+                
                 g_notifStart = GetTickCount64();
                 g_lastTime = GetTickCount64();
             }
@@ -173,6 +177,11 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
         g_showMenu = !g_showMenu;
         g_lastToggle = GetTickCount64();
     }
+    // Auto-save config when menu closes
+    if (g_prevShowMenu && !g_showMenu) {
+        ConfigManager::AutoSave();
+    }
+    g_prevShowMenu = g_showMenu;
     GUI::g_showMenu = g_showMenu;
 
     ULONGLONG now = GetTickCount64();

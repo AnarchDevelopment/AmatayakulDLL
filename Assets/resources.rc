@@ -15,4 +15,4 @@ IDR_ICON_UNLOCKFPS RCDATA "icons/unlockfps.png"
 IDR_ICON_WATERMARK RCDATA "icons/watermark.png"
 IDR_ICON_ARRAYLIST RCDATA "icons/arraylist.png"
 IDR_ICON_BACK RCDATA "icons/back.png"
-
+IDR_ICON_LOGO RCDATA "icons/amatayakul.png"

@@ -17,7 +17,6 @@ public:
     static ULONGLONG g_renderInfoEnableTime;
     static ULONGLONG g_renderInfoDisableTime;
     static float g_renderInfoAnim;
-    static float g_opacity;
     static HudElement* g_renderInfoHud;
 
     // Initialize renderinfo module

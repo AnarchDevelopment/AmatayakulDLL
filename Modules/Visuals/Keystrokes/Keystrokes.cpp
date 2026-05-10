@@ -9,17 +9,17 @@
 #include <cstdio>
 
 // Static member initialization
-bool Keystrokes::g_showKeystrokes = false;
+bool Keystrokes::g_showKeystrokes = true;
 float Keystrokes::g_keystrokesAnim = 0.0f;
 ULONGLONG Keystrokes::g_keystrokesEnableTime = 0;
 ULONGLONG Keystrokes::g_keystrokesDisableTime = 0;
 HudElement* Keystrokes::g_keystrokesHud = nullptr;
 
 
-float Keystrokes::g_keystrokesUIScale = 1.0f;
+float Keystrokes::g_keystrokesUIScale = 2.0f;
 bool Keystrokes::g_keystrokesBlurEffect = false;
 float Keystrokes::g_keystrokesRounding = 11.0f;
-bool Keystrokes::g_keystrokesShowBg = false;
+bool Keystrokes::g_keystrokesShowBg = true;
 bool Keystrokes::g_keystrokesRectShadow = false;
 float Keystrokes::g_keystrokesRectShadowOffset = 0.02f;
 bool Keystrokes::g_keystrokesBorder = false;
@@ -48,8 +48,8 @@ std::string Keystrokes::g_keystrokesRMBText = "RMB";
 std::string Keystrokes::g_keystrokesLMBCPSText = "{value} CPS";
 std::string Keystrokes::g_keystrokesRMBCPSText = "{value} CPS";
 
-ImVec4 Keystrokes::g_keystrokesBgColor = ImVec4(0.314f, 0.314f, 0.314f, 0.55f);
-ImVec4 Keystrokes::g_keystrokesEnabledColor = ImVec4(0.0f, 1.0f, 0.4f, 1.0f);
+ImVec4 Keystrokes::g_keystrokesBgColor = ImVec4(0.0f, 0.0f, 0.0f, 0.30f);
+ImVec4 Keystrokes::g_keystrokesEnabledColor = ImVec4(1.0f, 1.0f, 1.0f, 0.20f);
 ImVec4 Keystrokes::g_keystrokesTextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 ImVec4 Keystrokes::g_keystrokesTextEnabledColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 ImVec4 Keystrokes::g_keystrokesRectShadowColor = ImVec4(0.0f, 0.0f, 0.0f, 0.55f);
@@ -177,20 +177,22 @@ void Keystrokes::RenderDisplay(float sw, float sh) {
         
         // Keystrokes layout size calculation
         float scaledSize = 130.0f * g_keystrokesUIScale;
-        float scaledSpacebarWidth = (scaledSize * 3.0f + g_keystrokesKeySpacing * 2.0f * g_keystrokesUIScale) * g_keystrokesSpacebarWidth;
         float keySpacing = g_keystrokesKeySpacing * g_keystrokesUIScale;
         float keyHeight = 38.0f * g_keystrokesUIScale;
-        ImVec2 keystrokesSize = ImVec2(
-            scaledSize, 
-            scaledSize * 1.15f + 
-            (g_keystrokesShowMouseButtons ? (scaledSize * 0.5f) : 0.0f) +
-            (g_keystrokesShowSpacebar ? (keyHeight + keySpacing) : 0.0f)
-        );
+        float padding = 6.0f * g_keystrokesUIScale;
+        
+        int numRows = 2; // W and ASD always shown
+        if (g_keystrokesShowMouseButtons) numRows++;
+        if (g_keystrokesShowSpacebar) numRows++;
+        
+        float totalHeight = (padding * 2.0f) + (numRows * keyHeight) + ((numRows - 1) * keySpacing);
+        
+        ImVec2 keystrokesSize = ImVec2(scaledSize, totalHeight);
         g_keystrokesHud->size = keystrokesSize;
         
         // Initialize position on first draw
         if (g_keystrokesHud->pos.y == 0) {
-            g_keystrokesHud->pos = ImVec2(30, sh - 250);
+            g_keystrokesHud->pos = ImVec2(10, sh - 260);
         }
         
         // Handle drag and clamp when menu open

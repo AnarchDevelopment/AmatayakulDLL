@@ -1,6 +1,7 @@
 #pragma once
 
 #include <windows.h>
+#include "../../../ImGui/imgui.h"
 
 // Forward declarations
 class ImDrawList;
@@ -17,6 +18,12 @@ public:
     static ULONGLONG g_watermarkDisableTime;
     static float g_watermarkAnim;
     static HudElement* g_watermarkHud;
+
+    // Watermark settings
+    static bool g_fancyMode;      // true = logo image, false = text
+    static bool g_chromaEnabled;   // chroma color cycling on text
+    static ImVec4 g_textColor;     // custom text color (when chroma off)
+    static float g_logoScale;      // scale for the logo image
 
     /// @brief Initialize Watermark with HudElement reference
     static void Initialize(HudElement* hud);
