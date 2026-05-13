@@ -1,8 +1,12 @@
 ## Amatayakul Client
 
-A minecraft utility client for Minecraft Windows 10 Edition Beta 0.15.10
+Un client para Minecraft Windows 10 Edition Beta (0.15.10)
 
-## Preview
+Por favor reportar bugs al discord abajo:
+
+**Discord**: zhenrikepvp_ (Henrike)
+
+## Previa
 
 <img width="860" height="591" alt="image" src="https://github.com/user-attachments/assets/cd1a9914-21ba-4096-96c1-2c932bfa9025" />
 
