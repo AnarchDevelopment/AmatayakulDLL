@@ -15,7 +15,7 @@ float CPSCounter::g_cpsTextScale = 1.0f;
 ImVec4 CPSCounter::g_cpsTextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 
-float CPSCounter::g_cpsCounterAnim = 1.0f;
+float CPSCounter::g_cpsCounterAnim = 0.0f;
 ULONGLONG CPSCounter::g_cpsCounterEnableTime = 0;
 ULONGLONG CPSCounter::g_cpsCounterDisableTime = 0;
 

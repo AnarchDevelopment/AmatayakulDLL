@@ -10,7 +10,7 @@
 bool FPSCounter::g_showFpsCounter = true;
 float FPSCounter::g_fpsTextScale = 1.0f;
 ImVec4 FPSCounter::g_fpsTextColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-float FPSCounter::g_fpsCounterAnim = 1.0f;
+float FPSCounter::g_fpsCounterAnim = 0.0f;
 
 ULONGLONG FPSCounter::g_fpsCounterEnableTime = 0;
 ULONGLONG FPSCounter::g_fpsCounterDisableTime = 0;

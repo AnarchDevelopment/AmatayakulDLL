@@ -345,6 +345,50 @@ void ConfigManager::ApplyConfig(const nlohmann::json& c) {
 
 void ConfigManager::ReloadModulesAfterConfig() {
     // Reset animation times so modules re-animate properly
-    if (Watermark::g_showWatermark) Watermark::g_watermarkEnableTime = GetTickCount64();
-    if (Keystrokes::g_showKeystrokes) Keystrokes::g_keystrokesEnableTime = GetTickCount64();
+    ULONGLONG now = GetTickCount64();
+    
+    // Watermark
+    if (Watermark::g_showWatermark) {
+        Watermark::g_watermarkEnableTime = now;
+        Watermark::g_watermarkDisableTime = 0;
+    } else {
+        Watermark::g_watermarkAnim = 0.0f;
+        Watermark::g_watermarkEnableTime = 0;
+    }
+
+    // Keystrokes
+    if (Keystrokes::g_showKeystrokes) {
+        Keystrokes::g_keystrokesEnableTime = now;
+        Keystrokes::g_keystrokesDisableTime = 0;
+    } else {
+        Keystrokes::g_keystrokesAnim = 0.0f;
+        Keystrokes::g_keystrokesEnableTime = 0;
+    }
+
+    // CPS Counter
+    if (CPSCounter::g_showCpsCounter) {
+        CPSCounter::g_cpsCounterEnableTime = now;
+        CPSCounter::g_cpsCounterDisableTime = 0;
+    } else {
+        CPSCounter::g_cpsCounterAnim = 0.0f;
+        CPSCounter::g_cpsCounterEnableTime = 0;
+    }
+
+    // FPS Counter
+    if (FPSCounter::g_showFpsCounter) {
+        FPSCounter::g_fpsCounterEnableTime = now;
+        FPSCounter::g_fpsCounterDisableTime = 0;
+    } else {
+        FPSCounter::g_fpsCounterAnim = 0.0f;
+        FPSCounter::g_fpsCounterEnableTime = 0;
+    }
+
+    // RenderInfo
+    if (RenderInfo::g_showRenderInfo) {
+        RenderInfo::g_renderInfoEnableTime = now;
+        RenderInfo::g_renderInfoDisableTime = 0;
+    } else {
+        RenderInfo::g_renderInfoAnim = 0.0f;
+        RenderInfo::g_renderInfoEnableTime = 0;
+    }
 }

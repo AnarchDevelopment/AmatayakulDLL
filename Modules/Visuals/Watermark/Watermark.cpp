@@ -11,7 +11,7 @@
 bool Watermark::g_showWatermark = true;
 ULONGLONG Watermark::g_watermarkEnableTime = 0;
 ULONGLONG Watermark::g_watermarkDisableTime = 0;
-float Watermark::g_watermarkAnim = 1.0f;
+float Watermark::g_watermarkAnim = 0.0f;
 HudElement* Watermark::g_watermarkHud = nullptr;
 
 // Watermark settings
