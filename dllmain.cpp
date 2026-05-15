@@ -173,7 +173,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
 
     if (sw <= 0) return Hook::oPresent(pSwapChain, 0, Flags);
 
-    if ((GetAsyncKeyState(VK_INSERT) & 0x8000) && (GetTickCount64() - g_lastToggle) > 400) {
+    if ((GetAsyncKeyState(VK_RSHIFT) & 0x8000) && (GetTickCount64() - g_lastToggle) > 400) {
         g_showMenu = !g_showMenu;
         g_lastToggle = GetTickCount64();
     }
