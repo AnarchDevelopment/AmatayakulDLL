@@ -1,6 +1,21 @@
 #include "Animations.hpp"
 #include <cmath>
 #include <algorithm>
+#include "../ImGui/imgui.h"
+
+// === Linear Interpolation ===
+float Animations::Lerp(float a, float b, float t) {
+    return a + (b - a) * t;
+}
+
+ImVec4 Animations::Lerp(const ImVec4& a, const ImVec4& b, float t) {
+    return ImVec4(
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t,
+        a.w + (b.w - a.w) * t
+    );
+}
 
 // === Easing Functions ===
 

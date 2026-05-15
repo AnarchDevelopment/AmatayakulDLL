@@ -7,8 +7,11 @@
 #include <algorithm>
 #include <d3d11.h>
 #include "../Assets/stb/stb_image.h"
+#include "../Animations/Animations.hpp"
 
 #include "../Modules/Terminal/Terminal.hpp"
+
+extern HMODULE g_hModule;
 
 // Static member initialization
 bool GUI::g_showMenu = false;
@@ -17,7 +20,7 @@ float GUI::g_menuAnim = 0.0f;
 int GUI::g_currentTab = 0;
 int GUI::g_previousTab = 0;
 ULONGLONG GUI::g_tabChangeTime = 0;
-float GUI::g_tabAnim = 0.0f;
+float GUI::g_tabAnim = 1.0f;
 
 std::map<std::string, ImTextureID> GUI::g_icons;
 std::string GUI::g_currentSettingsModule = "";
@@ -44,12 +47,12 @@ namespace Spectrum {
 void GUI::ApplyTheme() {
     ImGuiStyle* style = &ImGui::GetStyle();
     
-    style->WindowRounding = 8.0f;
-    style->ChildRounding = 6.0f;
-    style->FrameRounding = 4.0f;
-    style->GrabRounding = 4.0f;
-    style->PopupRounding = 6.0f;
-    style->ScrollbarRounding = 4.0f;
+    style->WindowRounding = 12.0f;
+    style->ChildRounding = 10.0f;
+    style->FrameRounding = 6.0f;
+    style->GrabRounding = 6.0f;
+    style->PopupRounding = 8.0f;
+    style->ScrollbarRounding = 6.0f;
     
     style->WindowBorderSize = 0.0f;
     style->ChildBorderSize = 0.0f;
@@ -57,15 +60,15 @@ void GUI::ApplyTheme() {
     style->FrameBorderSize = 0.0f;
     
     style->ItemSpacing = ImVec2(10, 12);
-    style->WindowPadding = ImVec2(15, 15);
+    style->WindowPadding = ImVec2(0, 0); // No padding for main window to allow full sidebar
     
     ImVec4* colors = style->Colors;
     ImVec4 accent = ImVec4(0.85f, 0.05f, 0.10f, 1.0f); // Deep Blood Red
     
     colors[ImGuiCol_Text]                   = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);
     colors[ImGuiCol_TextDisabled]           = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
-    colors[ImGuiCol_WindowBg]               = ImVec4(0.06f, 0.06f, 0.06f, 1.00f);
-    colors[ImGuiCol_ChildBg]                = ImVec4(0.08f, 0.08f, 0.08f, 0.00f);
+    colors[ImGuiCol_WindowBg]               = ImVec4(0.05f, 0.05f, 0.05f, 1.00f);
+    colors[ImGuiCol_ChildBg]                = ImVec4(0.07f, 0.07f, 0.07f, 0.00f);
     colors[ImGuiCol_PopupBg]                = ImVec4(0.08f, 0.08f, 0.08f, 1.00f);
     colors[ImGuiCol_Border]                 = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
     colors[ImGuiCol_FrameBg]                = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
@@ -96,102 +99,34 @@ void GUI::ApplyTheme() {
     colors[ImGuiCol_Separator]              = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
     colors[ImGuiCol_SeparatorHovered]       = accent;
     colors[ImGuiCol_SeparatorActive]        = accent;
-    
-    colors[ImGuiCol_ResizeGrip]             = ImVec4(0.26f, 0.59f, 0.98f, 0.00f);
-    colors[ImGuiCol_ResizeGripHovered]      = ImVec4(0.26f, 0.59f, 0.98f, 0.00f);
-    colors[ImGuiCol_ResizeGripActive]       = ImVec4(0.26f, 0.59f, 0.98f, 0.00f);
-    
-    colors[ImGuiCol_Tab]                    = ImVec4(0.12f, 0.12f, 0.12f, 1.00f);
-    colors[ImGuiCol_TabHovered]             = accent;
-    colors[ImGuiCol_TabActive]              = accent;
-    colors[ImGuiCol_TabUnfocused]           = ImVec4(0.07f, 0.10f, 0.15f, 0.97f);
-    colors[ImGuiCol_TabUnfocusedActive]     = ImVec4(0.14f, 0.26f, 0.42f, 1.00f);
-    
-    colors[ImGuiCol_PlotLines]              = accent;
-    colors[ImGuiCol_PlotLinesHovered]       = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
-    colors[ImGuiCol_PlotHistogram]          = accent;
-    colors[ImGuiCol_PlotHistogramHovered]   = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
-    
-    colors[ImGuiCol_TableHeaderBg]          = ImVec4(0.19f, 0.19f, 0.20f, 1.00f);
-    colors[ImGuiCol_TableBorderStrong]      = ImVec4(0.31f, 0.31f, 0.35f, 1.00f);
-    colors[ImGuiCol_TableBorderLight]       = ImVec4(0.23f, 0.23f, 0.25f, 1.00f);
-    colors[ImGuiCol_TableRowBg]             = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_TableRowBgAlt]          = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
-    
-    colors[ImGuiCol_NavHighlight]           = accent;
-    colors[ImGuiCol_ModalWindowDimBg]       = ImVec4(0.00f, 0.00f, 0.00f, 0.60f);
 }
 
-void GUI::LoadFont() {
-    ImGuiIO& io = ImGui::GetIO();
-    
-    // Clear fonts to avoid duplicates during re-init
-    io.Fonts->Clear();
-
-    HMODULE hModule = GetModuleHandleA("amatayakul.dll");
-    if (!hModule) hModule = GetModuleHandleA(nullptr);
-
-    // IDR_FONT_ROBOTO = 106, RCDATA = 10
-    HRSRC hRes = FindResourceA(hModule, MAKEINTRESOURCE(106), (LPCSTR)10);
-    if (hRes) {
-        DWORD size = SizeofResource(hModule, hRes);
-        HGLOBAL hGlobal = LoadResource(hModule, hRes);
-        if (hGlobal) {
-            void* pData = LockResource(hGlobal);
-            if (pData && size > 0) {
-                // To be 100% safe, we copy the resource to a heap buffer.
-                // This prevents issues if the DLL's resource section is somehow paged out or protected.
-                void* font_copy = malloc(size);
-                if (font_copy) {
-                    memcpy(font_copy, pData, size);
-                    
-                    ImFontConfig config;
-                    memset(&config, 0, sizeof(ImFontConfig));
-                    new (&config) ImFontConfig(); // Use constructor for safe defaults
-                    
-                    config.FontDataOwnedByAtlas = true; // ImGui will free(font_copy) automatically
-                    config.OversampleH = 2;
-                    config.OversampleV = 2;
-                    config.PixelSnapH = true;
-                    strcpy(config.Name, "Roboto-Regular");
-                    
-                    ImFont* font = io.Fonts->AddFontFromMemoryTTF(font_copy, (int)size, 19.0f, &config, io.Fonts->GetGlyphRangesDefault());
-                    if (font) return; // Success!
-                    
-                    free(font_copy); // AddFont failed
-                }
-            }
-        }
+static HMODULE GetCurrentModule() {
+    MEMORY_BASIC_INFORMATION mbi;
+    if (VirtualQuery((LPCVOID)&GetCurrentModule, &mbi, sizeof(mbi)) != 0) {
+        return (HMODULE)mbi.AllocationBase;
     }
-
-    // Rock-solid fallback
-    io.Fonts->AddFontDefault();
+    return GetModuleHandleA("amatayakul.dll"); // Last resort fallback
 }
 
-#include <cstdio>
+static ID3D11ShaderResourceView* LoadTextureFromResource(ID3D11Device* device, int resourceId) {
+    HMODULE hMod = GetCurrentModule();
+    if (!hMod) return NULL;
 
-// Helper to load texture from resource
-ID3D11ShaderResourceView* LoadTextureFromResource(ID3D11Device* pDevice, int resId) {
-    HMODULE hMod = GetModuleHandleA("amatayakul.dll");
-    if (!hMod) hMod = GetModuleHandleA(NULL);
+    HRSRC hRes = FindResourceA(hMod, MAKEINTRESOURCEA(resourceId), (LPCSTR)10); // RT_RCDATA
+    if (!hRes) return NULL;
     
-    HRSRC hRes = FindResourceA(hMod, MAKEINTRESOURCEA(resId), RT_RCDATA);
-    if (!hRes) return nullptr;
-    
+    DWORD imageSize = SizeofResource(hMod, hRes);
     HGLOBAL hData = LoadResource(hMod, hRes);
-    if (!hData) return nullptr;
-    
-    void* pResData = LockResource(hData);
-    DWORD resSize = SizeofResource(hMod, hRes);
+    if (!hData) return NULL;
+    LPVOID pData = LockResource(hData);
     
     int width, height, channels;
-    unsigned char* data = stbi_load_from_memory((unsigned char*)pResData, resSize, &width, &height, &channels, 4);
-    if (!data) {
-        Terminal::AddOutput("[GUI] stbi_load_from_memory failed for resource: " + std::to_string(resId));
-        return nullptr;
-    }
-
-    D3D11_TEXTURE2D_DESC desc = {};
+    unsigned char* image = stbi_load_from_memory((unsigned char*)pData, imageSize, &width, &height, &channels, 4);
+    if (!image) return NULL;
+    
+    D3D11_TEXTURE2D_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
     desc.Width = width;
     desc.Height = height;
     desc.MipLevels = 1;
@@ -200,26 +135,50 @@ ID3D11ShaderResourceView* LoadTextureFromResource(ID3D11Device* pDevice, int res
     desc.SampleDesc.Count = 1;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-
-    D3D11_SUBRESOURCE_DATA subResource = {};
-    subResource.pSysMem = data;
-    subResource.SysMemPitch = width * 4;
-
-    ID3D11Texture2D* pTexture = nullptr;
-    HRESULT hr = pDevice->CreateTexture2D(&desc, &subResource, &pTexture);
-
-    ID3D11ShaderResourceView* pSRV = nullptr;
-    if (SUCCEEDED(hr) && pTexture) {
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = desc.Format;
+    desc.CPUAccessFlags = 0;
+    
+    ID3D11Texture2D* pTexture = NULL;
+    D3D11_SUBRESOURCE_DATA subResource;
+    subResource.pSysMem = image;
+    subResource.SysMemPitch = desc.Width * 4;
+    subResource.SysMemSlicePitch = 0;
+    device->CreateTexture2D(&desc, &subResource, &pTexture);
+    
+    ID3D11ShaderResourceView* out_srv = NULL;
+    if (pTexture) {
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+        ZeroMemory(&srvDesc, sizeof(srvDesc));
+        srvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = 1;
-        pDevice->CreateShaderResourceView(pTexture, &srvDesc, &pSRV);
+        device->CreateShaderResourceView(pTexture, &srvDesc, &out_srv);
         pTexture->Release();
     }
     
-    stbi_image_free(data);
-    return pSRV;
+    stbi_image_free(image);
+    return out_srv;
+}
+
+void GUI::LoadFont() {
+    ImGuiIO& io = ImGui::GetIO();
+    HMODULE hMod = GetCurrentModule();
+    if (!hMod) return;
+
+    HRSRC hRes = FindResourceA(hMod, MAKEINTRESOURCEA(IDR_FONT_ROBOTO), (LPCSTR)10); // RT_RCDATA
+    if (hRes) {
+        DWORD fontSize = SizeofResource(hMod, hRes);
+        HGLOBAL hData = LoadResource(hMod, hRes);
+        if (hData) {
+            LPVOID pFontData = LockResource(hData);
+            
+            // Let ImGui manage the memory to avoid allocation mismatches
+            void* pFontCopy = ImGui::MemAlloc(fontSize);
+            if (pFontCopy) {
+                memcpy(pFontCopy, pFontData, fontSize);
+                io.Fonts->AddFontFromMemoryTTF(pFontCopy, (int)fontSize, 18.0f);
+            }
+        }
+    }
 }
 
 void GUI::LoadIcons(void* pDevice) {
@@ -236,7 +195,10 @@ void GUI::LoadIcons(void* pDevice) {
         {"watermark", IDR_ICON_WATERMARK},
         {"arraylist", IDR_ICON_ARRAYLIST},
         {"back", IDR_ICON_BACK},
-        {"logo", IDR_ICON_LOGO}
+        {"logo", IDR_ICON_LOGO},
+        {"dashboard", IDR_ICON_DASHBOARD},
+        {"visuals", IDR_ICON_VISUALS},
+        {"misc", IDR_ICON_MISC}
     };
     
     for (auto& ic : icons) {
@@ -250,74 +212,138 @@ void GUI::LoadIcons(void* pDevice) {
     }
 }
 
-
-
-
-
 void GUI::UpdateAnimation(ULONGLONG now, float dt) {
     g_menuAnim = g_showMenu ? 1.0f : 0.0f;
+    
+    // Tab animation (fade/slide transition)
+    if (now - g_tabChangeTime < 300) {
+        float elapsed = (float)(now - g_tabChangeTime) / 300.0f;
+        g_tabAnim = elapsed;
+    } else {
+        g_tabAnim = 1.0f;
+    }
 }
 
 void GUI::RenderMenu(float screenWidth, float screenHeight) {
     if (!g_showMenu) return;
 
-    ImGui::SetNextWindowSize(ImVec2(850.0f, 580.0f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(880.0f, 600.0f), ImGuiCond_FirstUseEver);
     
-    // Standard window for maximum stability
+    // Smooth window scale animation (micro-animation)
+    float windowAlpha = Animations::EaseOutExpo(g_menuAnim);
+    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, windowAlpha);
+
     if (ImGui::Begin("Amatayakul Client", &g_showMenu, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize)) {
         
-        ImGui::Columns(2, "MainLayout", false);
-        ImGui::SetColumnWidth(0, 220.0f);
+        ImDrawList* windowDrawList = ImGui::GetWindowDrawList();
+        ImVec2 windowPos = ImGui::GetWindowPos();
+        ImVec2 windowSize = ImGui::GetWindowSize();
 
-        // --- SIDEBAR COLUMN ---
-        ImGui::Spacing();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.05f, 0.10f, 1.0f));
-        ImGui::SetWindowFontScale(1.4f);
-        ImGui::Text("  AMATAYAKUL");
-        ImGui::SetWindowFontScale(1.0f);
-        ImGui::PopStyleColor();
+        // 1. Sidebar Background & Rounded Corners
+        float sidebarWidth = 220.0f;
+        windowDrawList->AddRectFilled(windowPos, ImVec2(windowPos.x + sidebarWidth, windowPos.y + windowSize.y), 
+                                     ImGui::GetColorU32(ImVec4(0.04f, 0.04f, 0.04f, 1.0f)), 12.0f, ImDrawFlags_RoundCornersLeft);
         
-        ImGui::Spacing();
+        // --- SIDEBAR CONTENT ---
+        ImGui::SetCursorPos(ImVec2(0, 0));
+        ImGui::BeginChild("Sidebar", ImVec2(sidebarWidth, 0), false, ImGuiWindowFlags_NoScrollbar);
+        
+        ImGui::Spacing(); ImGui::Spacing();
+        ImTextureID logoTex = g_icons.count("logo") ? g_icons["logo"] : (ImTextureID)0;
+        if (logoTex) {
+            ImGui::SetCursorPosX(20);
+            ImGui::Image(logoTex, ImVec2(180, 72));
+        } else {
+            ImGui::SetCursorPosX(20);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.85f, 0.05f, 0.10f, 1.0f));
+            ImGui::SetWindowFontScale(1.4f);
+            ImGui::Text("  AMATAYAKUL");
+            ImGui::SetWindowFontScale(1.0f);
+            ImGui::PopStyleColor();
+        }
+        
+        ImGui::Spacing(); ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
 
-        auto TabButton = [](const char* label, int index) {
-            bool active = (GUI::g_currentTab == index);
+        // Styled Tab Buttons
+        auto StyledTabButton = [](const char* label, const char* iconName, int index) {
+            ImGuiContext& g = *GImGui;
+            ImGuiWindow* window = g.CurrentWindow;
             
-            if (active) {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.35f, 0.05f, 0.08f, 0.8f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.05f, 0.08f, 0.8f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.35f, 0.05f, 0.08f, 0.8f));
-            } else {
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.2f, 0.3f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.4f));
+            ImVec2 pos = window->DC.CursorPos;
+            ImVec2 size(200, 48);
+            ImGuiID id = window->GetID(label);
+            ImRect bb(pos.x + 10, pos.y, pos.x + 10 + size.x, pos.y + size.y);
+            
+            ImGui::ItemSize(size);
+            if (!ImGui::ItemAdd(bb, id)) return;
+
+            bool hovered, held;
+            bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+            if (pressed) {
+                if (GUI::g_currentTab != index) {
+                    GUI::g_previousTab = GUI::g_currentTab;
+                    GUI::g_currentTab = index;
+                    GUI::g_tabChangeTime = GetTickCount64();
+                    GUI::g_currentSettingsModule = ""; // Reset settings view on tab change
+                }
             }
 
-            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-            if (ImGui::Button(label, ImVec2(200, 45))) {
-                GUI::g_currentTab = index;
+            bool active = (GUI::g_currentTab == index);
+            
+            // Animation values
+            static std::map<ImGuiID, float> hoverAnims;
+            float& hoverAnim = hoverAnims[id];
+            hoverAnim = Animations::Lerp(hoverAnim, hovered ? 1.0f : 0.0f, 0.15f);
+
+            // Background rendering
+            ImU32 colBg = ImGui::GetColorU32(active ? ImVec4(0.25f, 0.05f, 0.07f, 0.8f) : (hovered ? ImVec4(1, 1, 1, 0.05f) : ImVec4(0, 0, 0, 0)));
+            window->DrawList->AddRectFilled(bb.Min, bb.Max, colBg, 6.0f);
+
+            // Selection indicator (Red bar on left)
+            if (active) {
+                window->DrawList->AddRectFilled(ImVec2(bb.Min.x - 2, bb.Min.y + 10), ImVec2(bb.Min.x + 2, bb.Max.y - 10), 
+                                                ImGui::GetColorU32(ImVec4(0.85f, 0.05f, 0.10f, 1.0f)), 2.0f);
             }
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor(3);
+
+            // Icon & Text
+            ImTextureID icon = g_icons.count(iconName) ? g_icons[iconName] : (ImTextureID)0;
+            if (icon) {
+                window->DrawList->AddImage(icon, ImVec2(bb.Min.x + 15, bb.Min.y + 12), ImVec2(bb.Min.x + 39, bb.Min.y + 36), 
+                                          ImVec2(0,0), ImVec2(1,1), ImGui::GetColorU32(active ? ImVec4(1,1,1,1) : ImVec4(0.7f, 0.7f, 0.7f, 1.0f)));
+                window->DrawList->AddText(ImVec2(bb.Min.x + 50, bb.Min.y + 14), active ? IM_COL32_WHITE : IM_COL32(180, 180, 180, 255), label);
+            } else {
+                window->DrawList->AddText(ImVec2(bb.Min.x + 20, bb.Min.y + 14), active ? IM_COL32_WHITE : IM_COL32(180, 180, 180, 255), label);
+            }
+
             ImGui::Spacing();
         };
 
-        TabButton("  DASHBOARD", 0);
-        TabButton("  VISUALS", 1);
-        TabButton("  MISC", 2);
-        TabButton("  INFO", 3);
+        StyledTabButton("DASHBOARD", "dashboard", 0);
+        StyledTabButton("VISUALS", "visuals", 1);
+        StyledTabButton("MISC", "misc", 2);
 
+        ImGui::EndChild(); // End Sidebar
 
-        ImGui::NextColumn();
+        // --- CONTENT AREA ---
+        ImGui::SetCursorPos(ImVec2(sidebarWidth + 20, 20));
+        
+        // 2. Tab Content Animation (Fade & Slide)
+        float contentAlpha = Animations::EaseOutExpo(g_tabAnim);
+        float contentSlide = (1.0f - contentAlpha) * 15.0f;
+        
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, contentAlpha);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + contentSlide);
 
-        // --- CONTENT COLUMN ---
+        ImGui::BeginChild("ContentArea", ImVec2(0, 0), false, ImGuiWindowFlags_NoScrollbar);
+        
+        const char* tabNames[] = { "DASHBOARD", "VISUALS", "MISC" };
+        ImGui::TextDisabled("AMATAYAKUL > %s", tabNames[GUI::g_currentTab]);
         ImGui::Spacing();
-        const char* tabNames[] = { "DASHBOARD", "VISUALS", "MISC", "INFO" };
-        ImGui::Text(tabNames[GUI::g_currentTab]);
-        ImGui::Spacing();
 
-        ImGui::BeginChild("Content", ImVec2(0,0), false);
+        ImGui::BeginChild("ContentScroll", ImVec2(0, 0), false);
+        
         float windowWidth = ImGui::GetWindowWidth();
         float spacing = 20.0f;
         int columns = 3;
@@ -353,7 +379,7 @@ void GUI::RenderMenu(float screenWidth, float screenHeight) {
             
             ImGui::SameLine();
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5);
-            ImGui::TextColored(ImVec4(0.68f, 0.12f, 0.18f, 1.0f), "MODULE SETTINGS > %s", GUI::g_currentSettingsModule.c_str());
+            ImGui::TextColored(ImVec4(0.85f, 0.05f, 0.10f, 1.0f), "MODULE SETTINGS > %s", GUI::g_currentSettingsModule.c_str());
             
             ImGui::Spacing();
             ImGui::Separator();
@@ -382,27 +408,39 @@ void GUI::RenderMenu(float screenWidth, float screenHeight) {
             GUI::RenderModuleCard("FPS Counter", "fpscounter", &FPSCounter::g_showFpsCounter, nullptr);
         } else if (GUI::g_currentTab == 2) { // Misc
             GUI::RenderModuleCard("Unlock FPS", "unlockfps", &UnlockFPS::g_unlockFpsEnabled, nullptr);
-        } else if (GUI::g_currentTab == 3) { // Info
-            Info::RenderMenu();
         } else { // Dashboard
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.68f, 0.12f, 0.18f, 1.0f)); // Blood red
             ImGui::SetWindowFontScale(1.8f);
-            ImGui::Text("WELCOME TO AMATAYAKUL");
+            ImGui::Text("WELCOME TO");
             ImGui::SetWindowFontScale(1.0f);
+            
+            if (logoTex) {
+                ImGui::Image(logoTex, ImVec2(300, 120));
+            } else {
+                ImGui::SetWindowFontScale(1.8f);
+                ImGui::Text("AMATAYAKUL");
+                ImGui::SetWindowFontScale(1.0f);
+            }
             ImGui::PopStyleColor();
             
             ImGui::Spacing();
-            ImGui::Text("The best client for minecraft beta");
+            ImGui::Text("The best client for minecraft beta 0.15.10");
             ImGui::Separator();
             ImGui::Spacing();
             
-            ImGui::Text("Build: stable-05-10-26");
+            ImGui::TextWrapped("Amatayakul Client is a premium PvP client designed for performance and aesthetics. It includes a modular HUD system with CPS/FPS counters, Keystrokes, and advanced watermark rendering.");
+            
+            ImGui::Spacing();
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Build: stable-05-13-26");
         }
-        ImGui::EndChild();
+
+        ImGui::EndChild(); // End ContentScroll
+        ImGui::EndChild(); // End ContentArea
         
-        ImGui::Columns(1);
+        ImGui::PopStyleVar(); // Pop Content Alpha
     }
     ImGui::End();
+    ImGui::PopStyleVar(); // Pop Window Alpha
 }
 
 void GUI::RenderModuleCard(const char* name, const char* iconName, bool* enabled, bool* showSettings) {
@@ -448,125 +486,52 @@ void GUI::RenderModuleCard(const char* name, const char* iconName, bool* enabled
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
     
     if (gearIcon) {
-        if (ImGui::ImageButton(std::string("##Set_" + std::string(name)).c_str(), gearIcon, ImVec2(20, 20))) {
-            g_currentSettingsModule = iconName;
+        if (ImGui::ImageButton((std::string("##Gear_") + name).c_str(), gearIcon, ImVec2(18, 18))) {
+            g_currentSettingsModule = iconName; // Use iconName as module ID
         }
     } else {
-        if (ImGui::Button(std::string("S##Set_" + std::string(name)).c_str(), ImVec2(30, 30))) {
+        if (ImGui::Button((std::string("S##") + name).c_str(), ImVec2(30, 30))) {
             g_currentSettingsModule = iconName;
         }
     }
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
-    
-    ImGui::SameLine();
-    ImGui::SetCursorPosX(55);
-    
-    // Toggle Button
-    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
-    if (*enabled) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.15f, 0.35f, 0.45f, 1.0f)); 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.9f, 1.0f, 1.0f)); 
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.18f, 0.22f, 1.0f)); 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5f, 0.7f, 0.8f, 1.0f)); 
-    }
-    
-    const char* btnLabel = *enabled ? "Enabled" : "Disabled";
-    std::string btnId = std::string(btnLabel) + "##Tog_" + std::string(name);
-    
-    if (ImGui::Button(btnId.c_str(), ImVec2(size.x - 70, 30))) {
-        *enabled = !*enabled;
-    }
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar();
+
+    // Toggle Button (Right)
+    ImGui::SameLine(size.x - 75);
+    ToggleButton((std::string("##Toggle_") + name).c_str(), enabled);
     
     ImGui::EndChild();
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
 }
 
-
-
-
-void GUI::RenderNotification(float screenWidth, float screenHeight) {
-    static ULONGLONG startTime = GetTickCount64();
-    float elapsed = (float)(GetTickCount64() - startTime) / 1000.0f;
-    if (elapsed >= 8.0f) return;
-
-    // Fade in/out effect
-    float alpha = 1.0f;
-    if (elapsed < 1.0f) alpha = elapsed;
-    else if (elapsed > 7.0f) alpha = 1.0f - (elapsed - 7.0f);
-
-    ImVec2 nS = ImVec2(320.0f, 75.0f);
-    ImGui::SetNextWindowPos(ImVec2(screenWidth - nS.x - 20.0f, screenHeight - nS.y - 20.0f));
-    ImGui::SetNextWindowSize(nS);
-    
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | 
-                             ImGuiWindowFlags_NoInputs | 
-                             ImGuiWindowFlags_NoBackground |
-                             ImGuiWindowFlags_NoSavedSettings;
-
-    if (ImGui::Begin("##Notif", NULL, flags)) {
-        ImDrawList* drawList = ImGui::GetWindowDrawList();
-        ImVec2 pos = ImGui::GetWindowPos();
-        
-        ImU32 bgCol = IM_COL32(15, 15, 15, (int)(240 * alpha));
-        ImU32 borderCol = IM_COL32(255, 255, 255, (int)(30 * alpha));
-        ImU32 accentCol = IM_COL32(173, 31, 46, (int)(255 * alpha));
-
-        // Background with rounding
-        drawList->AddRectFilled(pos, ImVec2(pos.x + nS.x, pos.y + nS.y), bgCol, 12.0f);
-        drawList->AddRect(pos, ImVec2(pos.x + nS.x, pos.y + nS.y), borderCol, 12.0f);
-        
-        // Vertical Accent bar - Simplified
-        drawList->AddRectFilled(pos, ImVec2(pos.x + 5, pos.y + nS.y), accentCol, 2.0f);
-
-        ImGui::SetCursorPos(ImVec2(20, 18));
-        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, alpha);
-        
-        ImGui::TextColored(ImVec4(0.68f, 0.12f, 0.18f, 1.0f), "AMATAYAKUL");
-        
-        ImGui::SetCursorPos(ImVec2(20, 40));
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.7f, 0.7f, 0.7f, 1.0f));
-        ImGui::Text("Press INSERT to open configuration");
-        ImGui::PopStyleColor();
-        
-        ImGui::PopStyleVar();
-    }
-    ImGui::End();
-
-
-}
-
 void GUI::ToggleButton(const char* label, bool* v) {
-    if (!v || !label) return;
+    ImGuiContext& g = *GImGui;
+    ImGuiWindow* window = g.CurrentWindow;
+    if (window->SkipItems) return;
 
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    if (!draw_list) return;
+    ImGuiID id = window->GetID(label);
+    ImVec2 pos = window->DC.CursorPos;
+    ImVec2 size(60.0f, 28.0f);
+    const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
+    ImGui::ItemSize(size, 0.0f);
+    if (!ImGui::ItemAdd(bb, id)) return;
 
-    ImVec2 p = ImGui::GetCursorScreenPos();
-    float height = ImGui::GetFrameHeight();
-    float width = height * 1.8f;
-    float radius = height * 0.50f;
-
-    ImGui::InvisibleButton(label, ImVec2(width, height));
-    if (ImGui::IsItemClicked())
-        *v = !*v;
+    bool hovered, held;
+    bool pressed = ImGui::ButtonBehavior(bb, id, &hovered, &held);
+    if (pressed) *v = !(*v);
 
     float t = *v ? 1.0f : 0.0f;
-    
-    ImU32 col_bg;
-    if (ImGui::IsItemHovered())
-        col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.12f, 0.12f, 0.12f, 1.0f), ImVec4(0.55f, 0.12f, 0.18f, 0.6f), t));
-    else
-        col_bg = ImGui::GetColorU32(ImLerp(ImVec4(0.08f, 0.08f, 0.08f, 1.0f), ImVec4(0.55f, 0.12f, 0.18f, 1.00f), t));
+    static std::map<ImGuiID, float> anims;
+    float& anim = anims[id];
+    anim = Animations::Lerp(anim, t, 0.15f);
 
-    draw_list->AddRectFilled(p, ImVec2(p.x + width, p.y + height), col_bg, height * 0.5f);
-    draw_list->AddCircleFilled(ImVec2(p.x + radius + t * (width - radius * 2.0f), p.y + radius), radius - 1.5f, IM_COL32(255, 255, 255, 255));
-    
-    ImGui::SameLine();
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2);
-    ImGui::Text(label);
+    ImU32 col_bg = ImGui::GetColorU32(Animations::Lerp(ImVec4(0.15f, 0.15f, 0.15f, 1.0f), ImVec4(0.85f, 0.05f, 0.10f, 1.0f), anim));
+    window->DrawList->AddRectFilled(bb.Min, bb.Max, col_bg, size.y / 2.0f);
+    window->DrawList->AddCircleFilled(ImVec2(bb.Min.x + size.y / 2.0f + anim * (size.x - size.y), bb.Min.y + size.y / 2.0f), size.y / 2.0f - 3.0f, IM_COL32_WHITE);
+}
+
+void GUI::RenderNotification(float screenWidth, float screenHeight) {
+    // Implement notification rendering if needed
 }
