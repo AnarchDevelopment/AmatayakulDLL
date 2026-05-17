@@ -8,5 +8,6 @@ Por favor reportar bugs al discord abajo:
 
 ## Previa
 
-<img width="860" height="591" alt="image" src="https://github.com/user-attachments/assets/cd1a9914-21ba-4096-96c1-2c932bfa9025" />
+<img width="889" height="615" alt="image" src="https://github.com/user-attachments/assets/582b1e43-5278-4c7d-86de-bb702b952145" />
+
 
