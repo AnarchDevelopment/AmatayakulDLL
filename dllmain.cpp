@@ -33,14 +33,38 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 // Global variables
 WNDPROC oWndProc = NULL;
 HMODULE g_hModule = NULL;
+bool g_showMenu = false;
+bool g_prevShowMenu = false;
+
+LRESULT CALLBACK hkWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (g_showMenu) {
+        ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+
+        switch (msg)
+        {
+            case WM_MOUSEMOVE:
+            case WM_LBUTTONDOWN:
+            case WM_LBUTTONUP:
+            case WM_RBUTTONDOWN:
+            case WM_RBUTTONUP:
+            case WM_MOUSEWHEEL:
+            case WM_KEYDOWN:
+            case WM_KEYUP:
+            case WM_SYSKEYDOWN:
+            case WM_SYSKEYUP:
+                // Ensure we don't block the toggle key
+                if (wParam == VK_RSHIFT) break;
+                return true; 
+        }
+    }
+    
+    return CallWindowProc(oWndProc, hWnd, msg, wParam, lParam);
+}
 
 ID3D11Device* pDevice = NULL;
 ID3D11DeviceContext* pContext = NULL;
 ID3D11RenderTargetView* mainRenderTargetView = NULL;
 HWND g_window = NULL;
-
-bool g_showMenu = false;
-bool g_prevShowMenu = false;
 bool g_RequestUnload = false;
 float g_lastW = 0, g_lastH = 0;
 ULONGLONG g_tabChangeTime = 0;
@@ -111,6 +135,7 @@ HRESULT STDMETHODCALLTYPE hkPresent_Impl(IDXGISwapChain* pSwapChain, UINT SyncIn
             
             ImGui::CreateContext();
             if (ImGui_ImplWin32_Init(g_window) && ImGui_ImplDX11_Init(pDevice, pContext)) {
+                oWndProc = (WNDPROC)SetWindowLongPtr(g_window, GWLP_WNDPROC, (LONG_PTR)hkWndProc);
                 GUI::LoadFont();
                 GUI::LoadIcons(pDevice);
                 ImGui_ImplDX11_CreateDeviceObjects();

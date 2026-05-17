@@ -12,6 +12,7 @@
 #include "../Modules/Terminal/Terminal.hpp"
 
 extern HMODULE g_hModule;
+extern ID3D11Device* pDevice;
 
 // Static member initialization
 bool GUI::g_showMenu = false;
@@ -224,8 +225,17 @@ void GUI::UpdateAnimation(ULONGLONG now, float dt) {
     }
 }
 
+#include "DX11/Shaders.hpp"
+
 void GUI::RenderMenu(float screenWidth, float screenHeight) {
     if (!g_showMenu) return;
+
+    // --- GAUSSIAN BLUR BACKGROUND ---
+    // Apply a high-quality blur effect to the background using the Shaders system
+    Shaders::SetDevice(pDevice); // pDevice is global from dllmain.cpp
+    Shaders::NewFrame();
+    Shaders::GausenBlur(ImGui::GetBackgroundDrawList(), ImVec4(0, 0, 0, 0.5f));
+    Shaders::ClearBlur();
 
     ImGui::SetNextWindowSize(ImVec2(880.0f, 600.0f), ImGuiCond_FirstUseEver);
     
@@ -431,7 +441,7 @@ void GUI::RenderMenu(float screenWidth, float screenHeight) {
             ImGui::TextWrapped("Amatayakul Client is a premium PvP client designed for performance and aesthetics. It includes a modular HUD system with CPS/FPS counters, Keystrokes, and advanced watermark rendering.");
             
             ImGui::Spacing();
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Build: stable-05-13-26");
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), "Build: stable-v1.0.3");
         }
 
         ImGui::EndChild(); // End ContentScroll
@@ -448,62 +458,92 @@ void GUI::RenderModuleCard(const char* name, const char* iconName, bool* enabled
     float spacing = 20.0f;
     int columns = 3;
     float cardWidth = (windowWidth - (spacing * (columns + 1))) / columns;
-    ImVec2 size(cardWidth, 140); // Taller cards
+    ImVec2 size(cardWidth, 200); // Slightly taller for padding
     
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.08f, 0.09f, 0.10f, 1.0f)); 
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.06f, 0.07f, 0.08f, 0.6f));
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 12.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     
     std::string childId = std::string("##Card_") + name;
     ImGui::BeginChild(childId.c_str(), size, true, ImGuiWindowFlags_NoScrollbar);
     
-    // Icon
+    ImDrawList* drawList = ImGui::GetWindowDrawList();
+
+    // 1. Icon Section (Top)
     ImTextureID iconTexture = (iconName && g_icons.count(iconName)) ? g_icons[iconName] : (ImTextureID)0;
     if (iconTexture) {
-        ImGui::SetCursorPos(ImVec2(size.x / 2 - 20, 20));
-        ImGui::Image(iconTexture, ImVec2(40, 40));
+        ImGui::SetCursorPos(ImVec2((size.x - 48) / 2, 20));
+        ImGui::Image(iconTexture, ImVec2(48, 48));
     } else {
-        ImGui::SetCursorPos(ImVec2(size.x / 2 - 15, 20));
+        ImGui::SetCursorPos(ImVec2((size.x - 30) / 2, 20));
         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.4f, 0.5f, 0.6f, 1.0f));
-        ImGui::SetWindowFontScale(1.5f);
+        ImGui::SetWindowFontScale(1.8f);
         ImGui::Text("[O]");
         ImGui::SetWindowFontScale(1.0f);
         ImGui::PopStyleColor();
     }
     
-    // Name
+    // 2. Name Section (Middle)
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 0.6f, 0.6f, 0.8f));
     ImVec2 textSize = ImGui::CalcTextSize(name);
-    ImGui::SetCursorPos(ImVec2((size.x - textSize.x) / 2, 70));
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.95f, 1.0f, 1.0f));
+    ImGui::SetCursorPos(ImVec2((size.x - textSize.x) / 2, 75));
     ImGui::Text("%s", name);
     ImGui::PopStyleColor();
+
+    float elementWidth = size.x - 20.0f;
+    float elementX = 10.0f;
+
+    // 3. Options Button (Clickable Bar)
+    float barY = 110.0f;
+    float barHeight = 35.0f;
+    ImGui::SetCursorPos(ImVec2(elementX, barY));
     
-    // Bottom Buttons
-    ImGui::SetCursorPos(ImVec2(15, size.y - 45));
-    
-    // Settings Button (Gear)
-    ImTextureID gearIcon = g_icons.count("gear") ? g_icons["gear"] : (ImTextureID)0;
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.15f, 0.18f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.12f, 0.14f, 0.16f, 0.5f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.20f, 0.22f, 0.7f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.10f, 0.11f, 0.12f, 0.8f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 8.0f);
     
-    if (gearIcon) {
-        if (ImGui::ImageButton((std::string("##Gear_") + name).c_str(), gearIcon, ImVec2(18, 18))) {
-            g_currentSettingsModule = iconName; // Use iconName as module ID
-        }
-    } else {
-        if (ImGui::Button((std::string("S##") + name).c_str(), ImVec2(30, 30))) {
-            g_currentSettingsModule = iconName;
-        }
+    if (ImGui::Button((std::string("##OptionsBtn_") + name).c_str(), ImVec2(elementWidth, barHeight))) {
+        g_currentSettingsModule = iconName;
     }
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
+    
+    // Draw Options Content (Text + Gear) over the button
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.9f, 0.9f, 1.0f));
+    ImGui::SetCursorPos(ImVec2(elementX + (elementWidth / 2) - 30, barY + (barHeight - ImGui::GetTextLineHeight()) / 2));
+    ImGui::SetWindowFontScale(0.85f);
+    ImGui::Text("OPTIONS");
+    ImGui::SetWindowFontScale(1.0f);
+    
+    ImTextureID gearIcon = g_icons.count("gear") ? g_icons["gear"] : (ImTextureID)0;
+    if (gearIcon) {
+        ImGui::SetCursorPos(ImVec2(elementX + elementWidth - 28, barY + (barHeight - 16) / 2));
+        ImGui::Image(gearIcon, ImVec2(16, 16));
+    }
+    ImGui::PopStyleColor(4); // Text + Button colors
 
-    // Toggle Button (Right)
-    ImGui::SameLine(size.x - 75);
-    ToggleButton((std::string("##Toggle_") + name).c_str(), enabled);
+    // 4. Toggle Button (Very Bottom)
+    float btnY = barY + barHeight + 8.0f; // 8px gap
+    float btnHeight = 35.0f;
+    ImGui::SetCursorPos(ImVec2(elementX, btnY));
+    
+    ImVec4 btnColor = *enabled ? ImVec4(0.0f, 0.68f, 0.45f, 1.0f) : ImVec4(0.75f, 0.12f, 0.28f, 1.0f);
+    ImVec4 btnHover = btnColor; btnHover.w *= 0.85f;
+    ImVec4 btnActive = btnColor; btnActive.w *= 0.7f;
+
+    ImGui::PushStyleColor(ImGuiCol_Button, btnColor);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, btnHover);
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, btnActive);
+    
+    if (ImGui::Button((std::string(*enabled ? "ENABLED##" : "DISABLED##") + name).c_str(), ImVec2(elementWidth, btnHeight))) {
+        *enabled = !(*enabled);
+    }
+    
+    ImGui::PopStyleVar(); // FrameRounding
+    ImGui::PopStyleColor(3); // Button colors
     
     ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2); // ChildRounding + WindowPadding
+    ImGui::PopStyleColor(); // ChildBg
 }
 
 void GUI::ToggleButton(const char* label, bool* v) {
@@ -533,5 +573,41 @@ void GUI::ToggleButton(const char* label, bool* v) {
 }
 
 void GUI::RenderNotification(float screenWidth, float screenHeight) {
-    // Implement notification rendering if needed
+    static ULONGLONG startTime = GetTickCount64();
+    ULONGLONG now = GetTickCount64();
+    float elapsed = (float)(now - startTime) / 1000.0f;
+    
+    if (elapsed > 8.0f) return;
+    
+    float alpha = 1.0f;
+    if (elapsed < 0.5f) alpha = elapsed / 0.5f;
+    else if (elapsed > 7.5f) alpha = 1.0f - (elapsed - 7.5f) / 0.5f;
+    
+    ImGui::SetNextWindowPos(ImVec2(screenWidth / 2.0f, 40.0f), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 10.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(20, 15));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.05f, 0.05f, 0.06f, 0.85f * alpha));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.85f, 0.05f, 0.10f, 0.4f * alpha));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+    
+    if (ImGui::Begin("##WelcomeNotif", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoFocusOnAppearing)) {
+        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 1, 1, alpha));
+        ImGui::Text("Welcome to Amatayakul Client");
+        
+        ImGui::SetWindowFontScale(0.9f);
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2);
+        ImGui::TextColored(ImVec4(0.85f, 0.05f, 0.10f, alpha), "Press RIGHT SHIFT to open mod menu");
+        ImGui::SetWindowFontScale(1.0f);
+        ImGui::PopStyleColor();
+        
+        // Red accent line at the bottom
+        ImVec2 pMin = ImGui::GetWindowPos();
+        ImVec2 pMax = ImVec2(pMin.x + ImGui::GetWindowWidth(), pMin.y + ImGui::GetWindowHeight());
+        ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(pMin.x, pMax.y - 3), pMax, ImGui::GetColorU32(ImVec4(0.85f, 0.05f, 0.10f, alpha)), 10.0f, ImDrawFlags_RoundCornersBottom);
+    }
+    ImGui::End();
+    
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(3);
 }

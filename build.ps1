@@ -27,9 +27,111 @@ if ($BuildType -eq "--debug") {
 $Output      = Join-Path $BinDir "amatayakul.dll"
 
 # Path to MinGW-w64 compiler
-$MinGWPath = "build-tool\mingw64/bin"
+$MinGWPath = "build-tool\mingw64\bin"
 $gpp = Join-Path $MinGWPath "g++.exe"
 $windres = Join-Path $MinGWPath "windres.exe"
+
+if (!(Test-Path $gpp)) {
+    # Try system path
+    $sysGpp = Get-Command g++ -ErrorAction SilentlyContinue
+    $sysWindres = Get-Command windres -ErrorAction SilentlyContinue
+    
+    if ($sysGpp -and $sysWindres) {
+        $gpp = $sysGpp.Source
+        $windres = $sysWindres.Source
+        Write-Log "Using system MinGW64 from: $(Split-Path $gpp)" "Info"
+    } else {
+        # Not found, ask to download
+        Write-Log "MinGW64 bins not found at $MinGWPath or system PATH." "Error"
+        $choice = Read-Host "Download now? [y/n]"
+        if ($choice.ToLower() -ne "y") {
+            Write-Log "Build cancelled." "Warn"
+            exit
+        }
+        
+        # Download and extract with progress
+        Write-Log "Downloading MinGW64 (WinLibs 15.2.0)..." "Info"
+        $url = "https://github.com/brechtsanders/winlibs_mingw/releases/download/15.2.0posix-14.0.0-msvcrt-r7/winlibs-x86_64-posix-seh-gcc-15.2.0-mingw-w64msvcrt-14.0.0-r7.zip"
+        $zipFile = "mingw_download.zip"
+        
+        if (!(Test-Path "build-tool")) { New-Item -ItemType Directory -Path "build-tool" | Out-Null }
+        
+        # Ensure assemblies are loaded for compatibility with Windows PowerShell
+        Add-Type -AssemblyName System.Net.Http
+        
+        try {
+            $client = New-Object System.Net.Http.HttpClient
+            $response = $client.GetAsync($url, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+            $totalSize = $response.Content.Headers.ContentLength
+            $readStream = $response.Content.ReadAsStreamAsync().Result
+            $fileStream = [System.IO.File]::Create((Join-Path (Get-Location) $zipFile))
+            
+            $buffer = New-Object byte[] 262144 # 256KB buffer
+            $received = 0
+            $lastReceived = 0
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            $lastTime = $sw.Elapsed.TotalSeconds
+            
+            Write-Host ""
+            while (($read = $readStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $fileStream.Write($buffer, 0, $read)
+                $received += $read
+                
+                $currTime = $sw.Elapsed.TotalSeconds
+                if ($currTime - $lastTime -ge 0.2) {
+                    $elapsed = $currTime - $lastTime
+                    $speedMbps = (($received - $lastReceived) * 8) / ($elapsed * 1024 * 1024)
+                    $mbLeft = ($totalSize - $received) / (1024 * 1024)
+                    $percent = ($received / $totalSize) * 100
+                    
+                    # Dynamic Progress Bar
+                    $barWidth = 30
+                    $done = [int]($percent * $barWidth / 100)
+                    $left = $barWidth - $done
+                    $bar = ("#" * $done) + ("-" * $left)
+                    
+                    $status = "`r    [{0}] {1:N1}% | Speed: {2:N2} Mbps | Remaining: {3:N1} MB" -f $bar, $percent, $speedMbps, $mbLeft
+                    Write-Host $status -NoNewline
+                    
+                    $lastTime = $currTime
+                    $lastReceived = $received
+                }
+            }
+            Write-Host "`n"
+            $fileStream.Close()
+            $readStream.Close()
+            $client.Dispose()
+        } catch {
+            Write-Log "Failed to download using HttpClient. Error: $_" "Error"
+            Write-Log "Falling back to basic download..." "Warn"
+            Invoke-WebRequest -Uri $url -OutFile $zipFile
+        }
+
+        if (Test-Path $zipFile) {
+            Write-Log "Extracting (high speed)..." "Info"
+            if (Get-Command tar -ErrorAction SilentlyContinue) {
+                # tar.exe is extremely fast and built into Win10/11
+                tar -xf $zipFile -C "build-tool"
+            } else {
+                # Fallback to Shell.Application (Explorer engine) which is faster than Expand-Archive
+                $shell = New-Object -ComObject Shell.Application
+                $zip = $shell.NameSpace((Get-Item $zipFile).FullName)
+                $dest = $shell.NameSpace((Get-Item "build-tool").FullName)
+                $dest.CopyHere($zip.Items(), 0x10)
+            }
+            Remove-Item $zipFile
+        }
+        
+        $gpp = Join-Path $MinGWPath "g++.exe"
+        $windres = Join-Path $MinGWPath "windres.exe"
+        
+        if (!(Test-Path $gpp)) {
+            Write-Log "Extraction failed or paths are incorrect after download." "Error"
+            exit
+        }
+        Write-Log "MinGW64 installed successfully." "Success"
+    }
+}
 
 $Sources =  "dllmain.cpp", 
             "ImGui/imgui.cpp", 
@@ -54,6 +156,7 @@ $Sources =  "dllmain.cpp",
             "Modules/ModuleManager.cpp",
             "GUI/GUI.cpp",
             "GUI/DX11/ImGuiRenderer.cpp",
+            "GUI/DX11/Shaders.cpp",
             "Hook/Hook.cpp",
             "Input/Input.cpp",
             "Animations/Animations.cpp",

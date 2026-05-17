@@ -10,6 +10,8 @@ HRESULT(STDMETHODCALLTYPE* Hook::oPresent)(IDXGISwapChain* pSwapChain, UINT Sync
 HRESULT(STDMETHODCALLTYPE* Hook::oResizeBuffers)(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags) = NULL;
 BOOL(WINAPI* Hook::oSetCursorPos)(int x, int y) = NULL;
 BOOL(WINAPI* Hook::oClipCursor)(const RECT* lpRect) = NULL;
+SHORT(WINAPI* Hook::oGetAsyncKeyState)(int vKey) = NULL;
+SHORT(WINAPI* Hook::oGetKeyState)(int vKey) = NULL;
 
 // External references from dllmain.cpp
 extern bool g_showMenu;
@@ -60,12 +62,16 @@ void Hook::Initialize() {
     
     void* pSetCP = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), "SetCursorPos");
     void* pClipC = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), "ClipCursor");
+    void* pGASKS = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), "GetAsyncKeyState");
+    void* pGKS = (void*)GetProcAddress(GetModuleHandleA("user32.dll"), "GetKeyState");
     
     // Create hooks
     if (pPres) MH_CreateHook(pPres, (LPVOID)Hook::hkPresent, (LPVOID*)&Hook::oPresent);
     if (pRes) MH_CreateHook(pRes, (LPVOID)Hook::hkResizeBuffers, (LPVOID*)&Hook::oResizeBuffers);
     if (pSetCP) MH_CreateHook(pSetCP, (LPVOID)Hook::hkSetCursorPos, (LPVOID*)&Hook::oSetCursorPos);
     if (pClipC) MH_CreateHook(pClipC, (LPVOID)Hook::hkClipCursor, (LPVOID*)&Hook::oClipCursor);
+    if (pGASKS) MH_CreateHook(pGASKS, (LPVOID)Hook::hkGetAsyncKeyState, (LPVOID*)&Hook::oGetAsyncKeyState);
+    if (pGKS) MH_CreateHook(pGKS, (LPVOID)Hook::hkGetKeyState, (LPVOID*)&Hook::oGetKeyState);
     
     // Enable all hooks
     MH_EnableHook(MH_ALL_HOOKS);
@@ -181,6 +187,23 @@ BOOL WINAPI Hook::hkClipCursor(const RECT* lpRect) {
     return Hook::oClipCursor(lpRect);
 }
 
+SHORT WINAPI Hook::hkGetAsyncKeyState(int vKey) {
+    if (g_showMenu) {
+        // Allow the toggle key to pass through so we can close the menu
+        if (vKey == VK_RSHIFT) return Hook::oGetAsyncKeyState(vKey);
+        return 0; // Block all other keys from the game
+    }
+    return Hook::oGetAsyncKeyState(vKey);
+}
+
+SHORT WINAPI Hook::hkGetKeyState(int vKey) {
+    if (g_showMenu) {
+        if (vKey == VK_RSHIFT) return Hook::oGetKeyState(vKey);
+        return 0; // Block all other keys from the game
+    }
+    return Hook::oGetKeyState(vKey);
+}
+
 void Hook::Shutdown() {
     // Desactivar y remover hooks individuales (más seguro)
     if (oPresent) {
@@ -205,6 +228,18 @@ void Hook::Shutdown() {
         MH_DisableHook(oClipCursor);
         MH_RemoveHook(oClipCursor);
         oClipCursor = NULL;
+    }
+
+    if (oGetAsyncKeyState) {
+        MH_DisableHook(oGetAsyncKeyState);
+        MH_RemoveHook(oGetAsyncKeyState);
+        oGetAsyncKeyState = NULL;
+    }
+
+    if (oGetKeyState) {
+        MH_DisableHook(oGetKeyState);
+        MH_RemoveHook(oGetKeyState);
+        oGetKeyState = NULL;
     }
 
     // Finalmente apagar MinHook

@@ -38,6 +38,8 @@ int CPSCounter::g_lmbCps = 0;
 int CPSCounter::g_rmbCps = 0;
 ULONGLONG CPSCounter::g_lastLmbClickTime = 0;
 ULONGLONG CPSCounter::g_lastRmbClickTime = 0;
+bool g_internalPrevLmb = false;
+bool g_internalPrevRmb = false;
 
 // Forward declarations for easing and HudElement (these will be linked from dllmain.cpp)
 extern bool g_showMenu;
@@ -47,41 +49,32 @@ void CPSCounter::Initialize(HudElement* hudElement) {
 }
 
 void CPSCounter::UpdateCPS(ULONGLONG now, bool lmbPressed, bool rmbPressed, bool prevLmbPressed, bool prevRmbPressed) {
-    // LMB CPS Counter - only save timestamp on click, with debounce
-    if (lmbPressed && !prevLmbPressed) {
-        if (now - g_lastLmbClickTime > 50) {
-            g_lmbClickTimes[g_lmbClickIndex] = now;
-            g_lmbClickIndex = (g_lmbClickIndex + 1) % MAX_CPS_HISTORY;
-            g_lastLmbClickTime = now;
-        }
+    static ULONGLONG lastReset = 0;
+    static int currentLmb = 0;
+    static int currentRmb = 0;
+
+    // Reset every 1 second
+    if (lastReset == 0) lastReset = now;
+    if (now - lastReset >= 1000) {
+        lastReset = now;
+        currentLmb = 0;
+        currentRmb = 0;
     }
+
+    // 1 click = add 1 cps
+    if (lmbPressed && !g_internalPrevLmb) {
+        currentLmb++;
+    }
+    g_internalPrevLmb = lmbPressed;
     
-    // Always calculate LMB CPS from timestamp array
-    int count = 0;
-    for (int i = 0; i < MAX_CPS_HISTORY; i++) {
-        if (g_lmbClickTimes[i] > 0 && (now - g_lmbClickTimes[i]) < 1000) {
-            count++;
-        }
+    // 1 click = add 1 cps
+    if (rmbPressed && !g_internalPrevRmb) {
+        currentRmb++;
     }
-    g_lmbCps = count;
-    
-    // RMB CPS Counter - only save timestamp on click, with debounce
-    if (rmbPressed && !prevRmbPressed) {
-        if (now - g_lastRmbClickTime > 50) {
-            g_rmbClickTimes[g_rmbClickIndex] = now;
-            g_rmbClickIndex = (g_rmbClickIndex + 1) % MAX_CPS_HISTORY;
-            g_lastRmbClickTime = now;
-        }
-    }
-    
-    // Always calculate RMB CPS from timestamp array
-    count = 0;
-    for (int i = 0; i < MAX_CPS_HISTORY; i++) {
-        if (g_rmbClickTimes[i] > 0 && (now - g_rmbClickTimes[i]) < 1000) {
-            count++;
-        }
-    }
-    g_rmbCps = count;
+    g_internalPrevRmb = rmbPressed;
+
+    g_lmbCps = currentLmb;
+    g_rmbCps = currentRmb;
 }
 
 void CPSCounter::UpdateAnimation(ULONGLONG now) {

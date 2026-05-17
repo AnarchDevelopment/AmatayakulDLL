@@ -174,8 +174,8 @@ int Input::KeyboardBlockHookProc(int nCode, WPARAM wParam, LPARAM lParam, bool m
     if (nCode == HC_ACTION) {
         PKBDLLHOOKSTRUCT pKey = (PKBDLLHOOKSTRUCT)lParam;
         if (pKey) {
-            // Allow INSERT key
-            if (pKey->vkCode == VK_INSERT) {
+            // Allow RSHIFT key
+            if (pKey->vkCode == VK_RSHIFT) {
                 return 0;  // Allow
             }
             // Block other keys

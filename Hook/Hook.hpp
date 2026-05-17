@@ -23,9 +23,15 @@ public:
     static BOOL WINAPI hkSetCursorPos(int x, int y);
     static BOOL WINAPI hkClipCursor(const RECT* lpRect);
     
+    // Input polling hooks
+    static SHORT WINAPI hkGetAsyncKeyState(int vKey);
+    static SHORT WINAPI hkGetKeyState(int vKey);
+    
     // Original function pointers
     static HRESULT(STDMETHODCALLTYPE* oPresent)(IDXGISwapChain* pSwapChain, UINT SyncInterval, UINT Flags);
     static HRESULT(STDMETHODCALLTYPE* oResizeBuffers)(IDXGISwapChain* pSwapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
     static BOOL(WINAPI* oSetCursorPos)(int x, int y);
     static BOOL(WINAPI* oClipCursor)(const RECT* lpRect);
+    static SHORT(WINAPI* oGetAsyncKeyState)(int vKey);
+    static SHORT(WINAPI* oGetKeyState)(int vKey);
 };
