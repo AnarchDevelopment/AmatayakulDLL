@@ -25,7 +25,7 @@
 
 <div align="center">
 
-<img src="Assets/Preview.png" alt="Amatayakul Preview" width="750" />
+<img src="Assets/PreviewRe.png" alt="Amatayakul Preview" width="750" />
 
 </div>
 
